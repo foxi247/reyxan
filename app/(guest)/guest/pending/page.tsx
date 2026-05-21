@@ -6,14 +6,17 @@ import { ConciergeBell, Clock, XCircle, Loader2 } from "lucide-react";
 import { MobileShell } from "@/components/hotel/mobile-shell";
 import { HotelLogo } from "@/components/hotel/hotel-logo";
 import { Badge } from "@/components/ui/badge";
-import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import Link from "next/link";
+
+type Status = "pending" | "approved" | "rejected" | "checking";
 
 function PendingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestId = searchParams.get("requestId");
-  const [status, setStatus] = useState<"pending" | "approved" | "rejected">("pending");
+  const [status, setStatus] = useState<Status>("pending");
 
   useEffect(() => {
     if (!requestId) {
@@ -21,35 +24,43 @@ function PendingContent() {
       return;
     }
 
-    const supabase = createClient();
+    let stopped = false;
 
-    // Subscribe to realtime updates
-    const channel = supabase
-      .channel(`request:${requestId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "guest_access_requests",
-          filter: `id=eq.${requestId}`,
-        },
-        (payload) => {
-          const newStatus = (payload.new as { status: string }).status as "pending" | "approved" | "rejected";
-          setStatus(newStatus);
+    async function poll() {
+      if (stopped) return;
+      try {
+        const res = await fetch(
+          `/api/guest/request-status?requestId=${requestId}`,
+          { cache: "no-store" }
+        );
+        const data = (await res.json()) as { status: string };
 
-          if (newStatus === "approved") {
-            toast.success("Заявка одобрена!", { description: "Переходим в личный кабинет..." });
-            setTimeout(() => router.push("/guest"), 1500);
-          } else if (newStatus === "rejected") {
-            toast.error("Заявка отклонена");
-          }
+        if (data.status === "approved") {
+          toast.success("Заявка одобрена!", {
+            description: "Переходим в личный кабинет…",
+          });
+          router.push("/guest");
+          return;
         }
-      )
-      .subscribe();
+
+        if (data.status === "rejected") {
+          setStatus("rejected");
+          return;
+        }
+      } catch {
+        // network error — keep polling
+      }
+
+      if (!stopped) {
+        setTimeout(poll, 3000);
+      }
+    }
+
+    // Start polling immediately
+    poll();
 
     return () => {
-      supabase.removeChannel(channel);
+      stopped = true;
     };
   }, [requestId, router]);
 
@@ -66,14 +77,10 @@ function PendingContent() {
           {/* Icon */}
           <div className="relative mb-6">
             <div className="flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-amber-50 to-stone-100 dark:from-stone-800 dark:to-stone-900 border-2 border-border">
-              {status === "pending" && (
-                <ConciergeBell className="h-12 w-12 text-gold stroke-[1.2]" />
-              )}
-              {status === "rejected" && (
+              {status === "rejected" ? (
                 <XCircle className="h-12 w-12 text-hotel-red" />
-              )}
-              {status === "approved" && (
-                <Loader2 className="h-12 w-12 text-gold animate-spin" />
+              ) : (
+                <ConciergeBell className="h-12 w-12 text-gold stroke-[1.2]" />
               )}
             </div>
 
@@ -86,7 +93,9 @@ function PendingContent() {
 
           {status === "rejected" ? (
             <>
-              <h1 className="font-serif text-3xl font-medium">Заявка отклонена.</h1>
+              <h1 className="font-serif text-3xl font-medium">
+                Заявка отклонена.
+              </h1>
               <p className="mt-3 text-muted-foreground leading-relaxed max-w-xs">
                 Пожалуйста, обратитесь к администратору на ресепшене.
               </p>
@@ -94,11 +103,14 @@ function PendingContent() {
                 <XCircle className="h-3.5 w-3.5" />
                 Заявка отклонена
               </Badge>
-            </>
-          ) : status === "approved" ? (
-            <>
-              <h1 className="font-serif text-3xl font-medium">Одобрено!</h1>
-              <p className="mt-3 text-muted-foreground">Переходим в личный кабинет…</p>
+              <Button
+                variant="outline"
+                size="lg"
+                className="mt-8 w-full"
+                asChild
+              >
+                <Link href="/guest/register">Попробовать снова</Link>
+              </Button>
             </>
           ) : (
             <>
@@ -106,7 +118,8 @@ function PendingContent() {
                 Заявка отправлена.
               </h1>
               <p className="mt-3 text-muted-foreground leading-relaxed max-w-xs">
-                Ожидайте подтверждения администратора. Это займёт несколько минут.
+                Ожидайте подтверждения администратора. Страница обновляется
+                автоматически.
               </p>
 
               {/* Status card */}
@@ -114,13 +127,15 @@ function PendingContent() {
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 flex-shrink-0">
                   <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                 </div>
-                <div className="text-left">
-                  <div className="font-medium text-sm">Ожидает подтверждения</div>
+                <div className="text-left flex-1">
+                  <div className="font-medium text-sm">
+                    Ожидает подтверждения
+                  </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
-                    Страница обновится автоматически
+                    Проверка каждые 3 секунды
                   </div>
                 </div>
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground ml-auto" />
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground flex-shrink-0" />
               </div>
 
               {/* Dots animation */}
@@ -143,13 +158,15 @@ function PendingContent() {
 
 export default function GuestPendingPage() {
   return (
-    <Suspense fallback={
-      <MobileShell>
-        <div className="flex min-h-screen items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-gold" />
-        </div>
-      </MobileShell>
-    }>
+    <Suspense
+      fallback={
+        <MobileShell>
+          <div className="flex min-h-screen items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-gold" />
+          </div>
+        </MobileShell>
+      }
+    >
       <PendingContent />
     </Suspense>
   );
