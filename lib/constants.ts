@@ -5,6 +5,7 @@ export const ROUTES = {
   guest: {
     register: "/guest/register",
     pending: "/guest/pending",
+    welcome: "/guest/welcome",
     home: "/guest",
     chat: "/guest/chat",
     menu: "/guest/menu",
@@ -19,6 +20,7 @@ export const ROUTES = {
     requests: "/admin/requests",
     orders: "/admin/orders",
     services: "/admin/services",
+    menu: "/admin/menu",
     settings: "/admin/settings",
   },
 } as const;

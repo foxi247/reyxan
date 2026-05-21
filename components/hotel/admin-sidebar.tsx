@@ -9,6 +9,7 @@ import {
   MessageCircle,
   ConciergeBell,
   Utensils,
+  UtensilsCrossed,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { href: ROUTES.admin.requests, label: "Запросы", Icon: ClipboardList },
   { href: ROUTES.admin.chat, label: "Чат", Icon: MessageCircle },
   { href: ROUTES.admin.orders, label: "Заказы еды", Icon: Utensils },
+  { href: ROUTES.admin.menu, label: "Меню", Icon: UtensilsCrossed },
   { href: ROUTES.admin.services, label: "Сервисы", Icon: ConciergeBell },
   { href: ROUTES.admin.settings, label: "Настройки", Icon: Settings },
 ];

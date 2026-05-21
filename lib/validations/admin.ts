@@ -46,8 +46,25 @@ export const extendStaySchema = z.object({
   newCheckOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Некорректная дата"),
 });
 
+export const menuCategorySchema = z.object({
+  name: z.string().min(1, "Введите название").max(100),
+  sort_order: z.number().int().min(0).default(0),
+  is_active: z.boolean().default(true),
+});
+
+export const menuItemSchema = z.object({
+  category_id: z.string().uuid("Выберите категорию"),
+  name: z.string().min(1, "Введите название").max(200),
+  description: z.string().max(500).optional(),
+  price: z.number().min(0, "Цена не может быть отрицательной"),
+  image_url: z.string().url().optional().or(z.literal("")),
+  is_available: z.boolean().default(true),
+});
+
 export type ApproveGuestInput = z.infer<typeof approveGuestSchema>;
 export type AdminMessageInput = z.infer<typeof adminMessageSchema>;
 export type ServiceInput = z.infer<typeof serviceSchema>;
 export type HotelSettingsInput = z.infer<typeof hotelSettingsSchema>;
 export type ExtendStayInput = z.infer<typeof extendStaySchema>;
+export type MenuCategoryInput = z.infer<typeof menuCategorySchema>;
+export type MenuItemInput = z.infer<typeof menuItemSchema>;

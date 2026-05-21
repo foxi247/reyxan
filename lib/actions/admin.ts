@@ -10,6 +10,8 @@ import {
   serviceSchema,
   hotelSettingsSchema,
   extendStaySchema,
+  menuCategorySchema,
+  menuItemSchema,
 } from "@/lib/validations/admin";
 import {
   generateGuestToken,
@@ -434,4 +436,138 @@ export async function adminLogout(): Promise<void> {
   const { createClient } = await import("@/lib/supabase/server");
   const supabase = await createClient();
   await supabase.auth.signOut();
+}
+
+// ── Menu Categories ────────────────────────────────────────────
+
+export async function createMenuCategory(
+  data: Parameters<typeof menuCategorySchema.parse>[0]
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const parsed = menuCategorySchema.safeParse(data);
+    if (!parsed.success) return { success: false, error: parsed.error.errors[0]?.message ?? "Ошибка" };
+    const supabase = createAdminClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await supabase.from("menu_categories").insert(parsed.data as any);
+    if (error) return { success: false, error: "Не удалось создать категорию" };
+    revalidatePath("/admin/menu");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+export async function updateMenuCategory(
+  id: string,
+  data: Parameters<typeof menuCategorySchema.parse>[0]
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const parsed = menuCategorySchema.safeParse(data);
+    if (!parsed.success) return { success: false, error: parsed.error.errors[0]?.message ?? "Ошибка" };
+    const supabase = createAdminClient();
+    const { error } = await supabase.from("menu_categories").update(parsed.data).eq("id", id);
+    if (error) return { success: false, error: "Не удалось обновить категорию" };
+    revalidatePath("/admin/menu");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+export async function deleteMenuCategory(id: string): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    const { error } = await supabase.from("menu_categories").delete().eq("id", id);
+    if (error) return { success: false, error: "Не удалось удалить категорию" };
+    revalidatePath("/admin/menu");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+// ── Menu Items ─────────────────────────────────────────────────
+
+export async function createMenuItem(
+  data: Parameters<typeof menuItemSchema.parse>[0]
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const parsed = menuItemSchema.safeParse(data);
+    if (!parsed.success) return { success: false, error: parsed.error.errors[0]?.message ?? "Ошибка" };
+    const supabase = createAdminClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await supabase.from("menu_items").insert(parsed.data as any);
+    if (error) return { success: false, error: "Не удалось создать позицию меню" };
+    revalidatePath("/admin/menu");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+export async function updateMenuItem(
+  id: string,
+  data: Parameters<typeof menuItemSchema.parse>[0]
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const parsed = menuItemSchema.safeParse(data);
+    if (!parsed.success) return { success: false, error: parsed.error.errors[0]?.message ?? "Ошибка" };
+    const supabase = createAdminClient();
+    const { error } = await supabase.from("menu_items").update(parsed.data).eq("id", id);
+    if (error) return { success: false, error: "Не удалось обновить позицию меню" };
+    revalidatePath("/admin/menu");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+export async function deleteMenuItem(id: string): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    const { error } = await supabase.from("menu_items").delete().eq("id", id);
+    if (error) return { success: false, error: "Не удалось удалить позицию меню" };
+    revalidatePath("/admin/menu");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+export async function toggleMenuItem(id: string, isAvailable: boolean): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    const { error } = await supabase.from("menu_items").update({ is_available: isAvailable }).eq("id", id);
+    if (error) return { success: false, error: "Не удалось изменить доступность" };
+    revalidatePath("/admin/menu");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+// ── Danger Zone ────────────────────────────────────────────────
+
+export async function resetGuestRequests(): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    await supabase.from("guest_access_requests").delete().gte("created_at", "1900-01-01");
+    revalidatePath("/admin");
+    return { success: true };
+  } catch { return { success: false, error: "Не удалось сбросить заявки" }; }
+}
+
+export async function fullSystemReset(): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    // Delete in dependency order
+    await supabase.from("room_service_order_items").delete().gte("id", "00000000-0000-0000-0000-000000000000");
+    await supabase.from("room_service_orders").delete().gte("created_at", "1900-01-01");
+    await supabase.from("chat_messages").delete().gte("created_at", "1900-01-01");
+    await supabase.from("chat_threads").delete().gte("created_at", "1900-01-01");
+    await supabase.from("service_requests").delete().gte("created_at", "1900-01-01");
+    await supabase.from("guests").delete().gte("created_at", "1900-01-01");
+    await supabase.from("guest_access_requests").delete().gte("created_at", "1900-01-01");
+    await supabase.from("rooms").update({ status: "available" }).gte("created_at", "1900-01-01");
+    revalidatePath("/admin");
+    revalidatePath("/admin/guests");
+    revalidatePath("/admin/requests");
+    revalidatePath("/admin/orders");
+    return { success: true };
+  } catch { return { success: false, error: "Не удалось выполнить полный сброс" }; }
 }

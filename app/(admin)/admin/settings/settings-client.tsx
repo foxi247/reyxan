@@ -3,23 +3,84 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Save, Loader2, QrCode, Copy, Check } from "lucide-react";
+import { Save, Loader2, QrCode, Copy, Check, AlertTriangle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { updateHotelSettings } from "@/lib/actions/admin";
+import {
+  updateHotelSettings,
+  resetGuestRequests,
+  fullSystemReset,
+} from "@/lib/actions/admin";
 import { hotelSettingsSchema, type HotelSettingsInput } from "@/lib/validations/admin";
 import { toast } from "sonner";
 import { HotelLogo } from "@/components/hotel/hotel-logo";
+import { useRouter } from "next/navigation";
 
 interface SettingsClientProps {
   settings: HotelSettingsInput | null;
   siteUrl: string;
 }
 
+function DangerAction({
+  label,
+  description,
+  confirmWord,
+  confirmPlaceholder,
+  onConfirm,
+  buttonLabel,
+}: {
+  label: string;
+  description: string;
+  confirmWord: string;
+  confirmPlaceholder: string;
+  onConfirm: () => Promise<void>;
+  buttonLabel: string;
+}) {
+  const [value, setValue] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleClick = async () => {
+    if (value !== confirmWord) return;
+    setLoading(true);
+    await onConfirm();
+    setValue("");
+    setLoading(false);
+  };
+
+  return (
+    <div className="flex items-start justify-between gap-4 py-4 border-b border-border last:border-0">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-destructive">{label}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+        <p className="text-xs text-muted-foreground mt-2">
+          Введите <span className="font-mono font-medium text-foreground">{confirmWord}</span> для подтверждения:
+        </p>
+        <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={confirmPlaceholder}
+          className="mt-1.5 max-w-[200px] font-mono text-sm"
+        />
+      </div>
+      <Button
+        variant="destructive"
+        size="sm"
+        disabled={value !== confirmWord || loading}
+        onClick={handleClick}
+        className="mt-6 flex-shrink-0"
+      >
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+        {buttonLabel}
+      </Button>
+    </div>
+  );
+}
+
 export function SettingsClient({ settings, siteUrl }: SettingsClientProps) {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const router = useRouter();
 
   const registerUrl = `${siteUrl || "http://localhost:3000"}/guest/register`;
 
@@ -100,7 +161,6 @@ export function SettingsClient({ settings, siteUrl }: SettingsClientProps) {
           </p>
 
           <div className="flex items-start gap-6">
-            {/* QR visual placeholder */}
             <div className="flex h-40 w-40 flex-shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-border bg-background">
               <div className="flex flex-col items-center gap-2 text-muted-foreground">
                 <QrCode className="h-12 w-12 opacity-30" />
@@ -133,6 +193,51 @@ export function SettingsClient({ settings, siteUrl }: SettingsClientProps) {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Danger Zone */}
+        <div className="hotel-card p-6 border border-destructive/30">
+          <div className="flex items-center gap-2 mb-1">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <h2 className="font-serif text-lg font-medium text-destructive">Опасная зона</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-5">
+            Эти действия необратимы. Введите слово-подтверждение перед выполнением.
+          </p>
+
+          <DangerAction
+            label="Удалить все заявки на заселение"
+            description="Удаляет все записи из журнала заявок (guest_access_requests). Гости и данные не затрагиваются."
+            confirmWord="reset"
+            confirmPlaceholder="Введите reset"
+            buttonLabel="Сбросить заявки"
+            onConfirm={async () => {
+              const result = await resetGuestRequests();
+              if (result.success) {
+                toast.success("Журнал заявок очищен");
+                router.refresh();
+              } else {
+                toast.error("Ошибка", { description: result.error });
+              }
+            }}
+          />
+
+          <DangerAction
+            label="Полный сброс системы"
+            description="Удаляет всех гостей, заявки, заказы, чаты и историю. Меню и сервисы сохраняются."
+            confirmWord="FULL RESET"
+            confirmPlaceholder="Введите FULL RESET"
+            buttonLabel="Полный сброс"
+            onConfirm={async () => {
+              const result = await fullSystemReset();
+              if (result.success) {
+                toast.success("Система сброшена", { description: "Все данные гостей удалены" });
+                router.refresh();
+              } else {
+                toast.error("Ошибка", { description: result.error });
+              }
+            }}
+          />
         </div>
       </div>
     </main>

@@ -37,9 +37,9 @@ function PendingContent() {
 
         if (data.status === "approved") {
           toast.success("Заявка одобрена!", {
-            description: "Переходим в личный кабинет…",
+            description: "Добро пожаловать в отель Рейхан!",
           });
-          router.push("/guest");
+          router.push("/guest/welcome");
           return;
         }
 
