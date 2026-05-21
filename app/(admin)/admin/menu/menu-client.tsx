@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash, Loader2, ChevronDown, ChevronRight, Tag } from "lucide-react";
+import { Plus, Pencil, Trash, Loader2, ChevronDown, ChevronRight, Tag, Upload, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,76 @@ type MenuItem = {
   id: string; category_id: string; name: string; description: string | null;
   price: number; image_url: string | null; is_available: boolean;
 };
+
+// ── Image Upload Field ───────────────────────────────────────────
+
+function ImageUploadField({
+  value,
+  onChange,
+  folder = "menu",
+}: {
+  value?: string;
+  onChange: (url: string) => void;
+  folder?: string;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("folder", folder);
+      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.url) onChange(data.url);
+      else toast.error("Ошибка загрузки", { description: data.error });
+    } catch {
+      toast.error("Ошибка загрузки файла");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <Input
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="https://… или загрузите файл"
+          className="flex-1"
+        />
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-border hover:bg-accent transition-colors disabled:opacity-50"
+        >
+          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+        </button>
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-border hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      {value && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={value} alt="preview" className="h-24 w-full object-cover rounded-xl border border-border" />
+      )}
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+    </div>
+  );
+}
 
 // ── Category Dialog ──────────────────────────────────────────────
 
@@ -118,6 +188,7 @@ function MenuItemDialog({
   onSuccess: () => void;
 }) {
   const [loading, setLoading] = useState(false);
+  const [imageUrl, setImageUrl] = useState(item?.image_url ?? "");
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<MenuItemInput>({
     resolver: zodResolver(menuItemSchema),
     defaultValues: item
@@ -139,8 +210,8 @@ function MenuItemDialog({
   const onSubmit = async (data: MenuItemInput) => {
     setLoading(true);
     const result = item
-      ? await updateMenuItem(item.id, data)
-      : await createMenuItem(data);
+      ? await updateMenuItem(item.id, { ...data, image_url: imageUrl || undefined })
+      : await createMenuItem({ ...data, image_url: imageUrl || undefined });
     if (result.success) {
       toast.success(item ? "Блюдо обновлено" : "Блюдо добавлено");
       onSuccess();
@@ -206,8 +277,12 @@ function MenuItemDialog({
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>URL изображения (необязательно)</Label>
-            <Input placeholder="https://…" {...register("image_url")} />
+            <Label>Фото блюда (необязательно)</Label>
+            <ImageUploadField
+              value={imageUrl}
+              onChange={(url) => { setImageUrl(url); setValue("image_url", url); }}
+              folder="menu"
+            />
           </div>
           <Button type="submit" size="lg" className="w-full" disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Сохранить"}

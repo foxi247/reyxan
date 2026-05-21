@@ -9,13 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { updateCleaningStatus, scheduleRoomCleaning } from "@/lib/actions/admin";
+import { updateCleaningStatus, scheduleRoomCleaning, assignCleaningTask } from "@/lib/actions/admin";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface CleaningRecord {
   id: string; room_id: string; status: string; notes: string | null;
-  completed_at: string | null; created_at: string;
+  completed_at: string | null; created_at: string; assigned_to_id: string | null;
   rooms: { number: string; floor: number | null } | null;
 }
 
@@ -28,7 +28,7 @@ const STATUS_CONFIG: Record<CleanStatus, { label: string; color: string; Icon: R
   skipped:     { label: "Пропущено",  color: "text-muted-foreground", Icon: AlertCircle },
 };
 
-function RecordCard({ record }: { record: CleaningRecord }) {
+function RecordCard({ record, staff }: { record: CleaningRecord; staff: { id: string; name: string }[] }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [notes, setNotes] = useState(record.notes ?? "");
@@ -40,6 +40,12 @@ function RecordCard({ record }: { record: CleaningRecord }) {
     if (result.success) { toast.success("Статус обновлён"); router.refresh(); }
     else toast.error("Ошибка", { description: result.error });
     setLoading(false);
+  };
+
+  const handleAssign = async (staffId: string) => {
+    const result = await assignCleaningTask(record.id, staffId === "none" ? null : staffId);
+    if (result.success) router.refresh();
+    else toast.error("Ошибка", { description: result.error });
   };
 
   const cfg = STATUS_CONFIG[record.status as CleanStatus] ?? STATUS_CONFIG.pending;
@@ -67,6 +73,24 @@ function RecordCard({ record }: { record: CleaningRecord }) {
           {cfg.label}
         </div>
       </div>
+
+      {/* Staff assignment */}
+      {staff.length > 0 && record.status !== "done" && (
+        <Select
+          value={record.assigned_to_id ?? "none"}
+          onValueChange={handleAssign}
+        >
+          <SelectTrigger className="h-7 text-xs rounded-xl">
+            <SelectValue placeholder="Назначить уборщицу" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none" className="text-xs">Не назначена</SelectItem>
+            {staff.map((s) => (
+              <SelectItem key={s.id} value={s.id} className="text-xs">{s.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       {record.notes && !showNotes && (
         <p className="text-xs text-muted-foreground italic">&ldquo;{record.notes}&rdquo;</p>
@@ -113,11 +137,12 @@ function RecordCard({ record }: { record: CleaningRecord }) {
 }
 
 export function HousekeepingClient({
-  records, allRooms,
+  records, allRooms, staff,
 }: {
   records: CleaningRecord[];
   allRooms: { id: string; number: string; floor: number | null; status: string }[];
   today: string;
+  staff: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [addingRoom, setAddingRoom] = useState<string | null>(null);
@@ -184,7 +209,7 @@ export function HousekeepingClient({
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-8">
           {records.map((rec) => (
-            <RecordCard key={rec.id} record={rec} />
+            <RecordCard key={rec.id} record={rec} staff={staff} />
           ))}
         </div>
       )}

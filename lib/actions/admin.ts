@@ -20,6 +20,7 @@ import {
 } from "@/lib/auth/guest-session";
 import type { ActionResult } from "@/types/app";
 import { revalidatePath } from "next/cache";
+import { sendPushToGuest } from "@/lib/push/send-push";
 
 export async function approveGuestRequest(
   requestId: string,
@@ -662,6 +663,41 @@ export async function scheduleRoomCleaning(roomId: string): Promise<ActionResult
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .from("cleaning_records").insert({ room_id: roomId, scheduled_date: today } as any);
     if (error) return { success: false, error: "Не удалось запланировать уборку" };
+
+    // Notify the current guest in this room
+    const { data: guestRaw } = await supabase
+      .from("guests")
+      .select("id, first_name")
+      .eq("room_id", roomId)
+      .eq("status", "active")
+      .limit(1)
+      .single();
+    const activeGuest = guestRaw as { id: string; first_name: string } | null;
+
+    if (activeGuest) {
+      const { data: threadRaw } = await supabase
+        .from("chat_threads")
+        .select("id")
+        .eq("guest_id", activeGuest.id)
+        .eq("status", "open")
+        .limit(1)
+        .single();
+      const thread = threadRaw as { id: string } | null;
+      if (thread) {
+        const text = `🧹 Уважаемый(ая) ${activeGuest.first_name}, сегодня запланирована уборка вашего номера. Если вам неудобно — пожалуйста, сообщите нам.`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await supabase.from("chat_messages").insert({ thread_id: thread.id, sender_type: "admin", sender_id: null, message: text } as any);
+        await supabase.from("chat_threads").update({ last_message_at: new Date().toISOString() }).eq("id", thread.id);
+
+        await sendPushToGuest(activeGuest.id, {
+          title: "Уборка номера",
+          body: "Сегодня запланирована уборка вашего номера.",
+          url: "/guest/chat",
+          tag: "housekeeping",
+        });
+      }
+    }
+
     revalidatePath("/admin/housekeeping");
     revalidatePath("/admin/rooms");
     return { success: true };
@@ -730,6 +766,14 @@ export async function sendCheckoutReminder(guestId: string): Promise<ActionResul
       .update({ last_message_at: new Date().toISOString() })
       .eq("id", thread.id);
 
+    // Push notification to guest
+    await sendPushToGuest(guestId, {
+      title: "Напоминание о выезде",
+      body: `Уважаемый(ая) ${guest.first_name}, ваш выезд ${checkOutDate}. Пожалуйста, освободите номер до 12:00.`,
+      url: "/guest/chat",
+      tag: "checkout-reminder",
+    });
+
     revalidatePath("/admin/guests");
     return { success: true };
   } catch { return { success: false, error: "Произошла ошибка" }; }
@@ -750,6 +794,132 @@ export async function updatePreBookingStatus(
       .eq("id", id);
     if (error) return { success: false, error: "Не удалось обновить статус" };
     revalidatePath("/admin/bookings");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+// ── Room CRUD ──────────────────────────────────────────────────
+
+export async function createRoom(data: {
+  number: string;
+  floor?: number | null;
+  description?: string;
+  amenities?: string;
+  photo_url?: string;
+}): Promise<ActionResult<{ id: string }>> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    const { data: room, error } = await supabase
+      .from("rooms")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .insert({ number: data.number, floor: data.floor ?? null, status: "available", description: data.description || null, amenities: data.amenities || null, photo_url: data.photo_url || null } as any)
+      .select("id")
+      .single();
+    if (error) return { success: false, error: "Не удалось создать номер" };
+    revalidatePath("/admin/rooms");
+    return { success: true, data: { id: (room as { id: string }).id } };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+export async function updateRoom(id: string, data: {
+  number?: string;
+  floor?: number | null;
+  description?: string;
+  amenities?: string;
+  photo_url?: string;
+}): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from("rooms")
+      .update({ ...data, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) return { success: false, error: "Не удалось обновить номер" };
+    revalidatePath("/admin/rooms");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+export async function deleteRoom(id: string): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    const { error } = await supabase.from("rooms").delete().eq("id", id);
+    if (error) return { success: false, error: "Не удалось удалить номер" };
+    revalidatePath("/admin/rooms");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+// ── Staff management ───────────────────────────────────────────
+
+export async function createStaffMember(data: {
+  name: string;
+  role: "cleaner" | "kitchen";
+  username: string;
+  password: string;
+}): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const bcrypt = await import("bcryptjs");
+    const passwordHash = await bcrypt.hash(data.password, 12);
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from("staff_members")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .insert({ name: data.name, role: data.role, username: data.username, password_hash: passwordHash, is_active: true } as any);
+    if (error?.code === "23505") return { success: false, error: "Логин уже занят" };
+    if (error) return { success: false, error: "Не удалось создать аккаунт" };
+    revalidatePath("/admin/staff");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+export async function updateStaffMember(id: string, data: {
+  name?: string;
+  is_active?: boolean;
+  password?: string;
+}): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    const update: Record<string, unknown> = {};
+    if (data.name !== undefined) update.name = data.name;
+    if (data.is_active !== undefined) update.is_active = data.is_active;
+    if (data.password) {
+      const bcrypt = await import("bcryptjs");
+      update.password_hash = await bcrypt.hash(data.password, 12);
+    }
+    const { error } = await supabase.from("staff_members").update(update).eq("id", id);
+    if (error) return { success: false, error: "Не удалось обновить сотрудника" };
+    revalidatePath("/admin/staff");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+export async function deleteStaffMember(id: string): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    const { error } = await supabase.from("staff_members").delete().eq("id", id);
+    if (error) return { success: false, error: "Не удалось удалить сотрудника" };
+    revalidatePath("/admin/staff");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+export async function assignCleaningTask(recordId: string, staffId: string | null): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from("cleaning_records")
+      .update({ assigned_to_id: staffId })
+      .eq("id", recordId);
+    if (error) return { success: false, error: "Не удалось назначить задание" };
+    revalidatePath("/admin/housekeeping");
     return { success: true };
   } catch { return { success: false, error: "Произошла ошибка" }; }
 }

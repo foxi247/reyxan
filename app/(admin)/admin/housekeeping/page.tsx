@@ -7,24 +7,26 @@ async function getHousekeepingData() {
   const supabase = createAdminClient();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [{ data: records }, { data: rooms }] = await Promise.all([
+  const [{ data: records }, { data: rooms }, { data: staff }] = await Promise.all([
     supabase
       .from("cleaning_records")
       .select("*, rooms(number, floor)")
       .eq("scheduled_date", today)
       .order("created_at"),
     supabase.from("rooms").select("id, number, floor, status").order("number"),
+    supabase.from("staff_members").select("id, name").eq("role", "cleaner").eq("is_active", true),
   ]);
 
   return {
     records: (records ?? []) as {
       id: string; room_id: string; status: string; notes: string | null;
-      completed_at: string | null; created_at: string;
+      completed_at: string | null; created_at: string; assigned_to_id: string | null;
       rooms: { number: string; floor: number | null } | null;
     }[],
     allRooms: (rooms ?? []) as {
       id: string; number: string; floor: number | null; status: string;
     }[],
+    staff: (staff ?? []) as { id: string; name: string }[],
     today,
   };
 }

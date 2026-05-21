@@ -17,6 +17,7 @@ import {
   Settings,
   LogOut,
   X,
+  UserCog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HotelLogo } from "@/components/hotel/hotel-logo";
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
   { href: ROUTES.admin.housekeeping, label: "Уборка", Icon: Sparkles },
   { href: ROUTES.admin.bookings, label: "Бронирования", Icon: CalendarPlus },
   { href: ROUTES.admin.analytics, label: "Аналитика", Icon: BarChart3 },
+  { href: "/admin/staff", label: "Персонал", Icon: UserCog },
   { href: ROUTES.admin.settings, label: "Настройки", Icon: Settings },
 ];
 

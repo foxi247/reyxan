@@ -91,7 +91,7 @@ export function AdminShell({ email, title, subtitle, children }: AdminShellProps
         </header>
 
         {/* Content — reserve space for mobile bottom nav */}
-        <div className="flex-1 overflow-hidden pb-[60px] md:pb-0">
+        <div className="flex-1 flex flex-col overflow-hidden pb-[60px] md:pb-0">
           {children}
         </div>
       </div>

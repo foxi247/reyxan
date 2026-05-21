@@ -23,6 +23,7 @@ async function getRoomsData() {
     rooms: (rooms ?? []) as {
       id: string; number: string; floor: number | null;
       status: "available" | "occupied" | "maintenance";
+      description: string | null; amenities: string | null; photo_url: string | null;
     }[],
     guestMap: Object.fromEntries(
       (guests ?? []).map((g) => [
