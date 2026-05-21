@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { requireAdmin } from "@/lib/auth/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AdminSidebar } from "@/components/hotel/admin-sidebar";
 import { AdminTopbar } from "@/components/hotel/admin-topbar";
 import { AdminChatClient } from "./chat-client";
+import { Loader2 } from "lucide-react";
 
 async function getChatData() {
   const supabase = createAdminClient();
@@ -27,7 +29,13 @@ export default async function AdminChatPage() {
           title="Чат с гостями"
           subtitle="Общение и поддержка гостей в реальном времени"
         />
-        <AdminChatClient threads={threads as any} adminId={admin.id} />
+        <Suspense fallback={
+          <div className="flex flex-1 items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-gold" />
+          </div>
+        }>
+          <AdminChatClient threads={threads as any} adminId={admin.id} />
+        </Suspense>
       </div>
     </div>
   );

@@ -5,10 +5,18 @@ import { useRouter } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { updateServiceRequestStatus } from "@/lib/actions/admin";
 import { timeAgo } from "@/lib/utils";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Clock } from "lucide-react";
 
 interface ServiceReq {
   id: string;
@@ -18,7 +26,7 @@ interface ServiceReq {
   created_at: string;
   guests: { first_name: string; last_name: string } | null;
   rooms: { number: string } | null;
-  services: { title: string; icon: string } | null;
+  services: { title: string; icon: string; estimated_wait_minutes?: number } | null;
 }
 
 const STATUS_BADGE: Record<string, React.ReactNode> = {
@@ -28,13 +36,72 @@ const STATUS_BADGE: Record<string, React.ReactNode> = {
   cancelled: <Badge variant="cream">Отменено</Badge>,
 };
 
+function EtaDialog({
+  open,
+  onClose,
+  req,
+  onConfirm,
+}: {
+  open: boolean;
+  onClose: () => void;
+  req: ServiceReq | null;
+  onConfirm: (etaMinutes: number) => void;
+}) {
+  const defaultEta = req?.services?.estimated_wait_minutes ?? 30;
+  const [eta, setEta] = useState(defaultEta);
+
+  if (!req) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-gold" />
+            Принять в работу
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Заявка <span className="font-medium text-foreground">«{req.title}»</span> будет принята в работу. Гость получит автоматическое уведомление в чат.
+          </p>
+          <div className="space-y-1.5">
+            <Label>Время ожидания (мин)</Label>
+            <Input
+              type="number"
+              min={1}
+              max={999}
+              value={eta}
+              onChange={(e) => setEta(Number(e.target.value) || defaultEta)}
+              className="text-center font-medium text-lg h-12"
+            />
+            <p className="text-xs text-muted-foreground">
+              Гость получит: «Заявка принята, ожидайте ~{eta} мин.»
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={onClose}>
+              Отмена
+            </Button>
+            <Button className="flex-1 gold-gradient text-white border-0" onClick={() => onConfirm(eta)}>
+              Принять
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function RequestCard({
   req,
   onUpdate,
+  onInProgress,
   updating,
 }: {
   req: ServiceReq;
   onUpdate: (id: string, status: "new" | "in_progress" | "done" | "cancelled") => void;
+  onInProgress: (req: ServiceReq) => void;
   updating: string | null;
 }) {
   return (
@@ -63,9 +130,11 @@ function RequestCard({
               variant="cream"
               className="h-8 text-xs flex-1"
               disabled={updating === req.id}
-              onClick={() => onUpdate(req.id, "in_progress")}
+              onClick={() => onInProgress(req)}
             >
-              {updating === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "В работе"}
+              {updating === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (
+                <><Clock className="h-3 w-3" /> В работе</>
+              )}
             </Button>
           )}
           <Button
@@ -75,7 +144,7 @@ function RequestCard({
             disabled={updating === req.id}
             onClick={() => onUpdate(req.id, "done")}
           >
-            {updating === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Выполнено"}
+            {updating === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Выполнено ✓"}
           </Button>
           <Button
             size="sm"
@@ -84,7 +153,7 @@ function RequestCard({
             disabled={updating === req.id}
             onClick={() => onUpdate(req.id, "cancelled")}
           >
-            Отменить
+            Отмена
           </Button>
         </div>
       )}
@@ -95,15 +164,23 @@ function RequestCard({
 export function RequestsClient({ requests }: { requests: ServiceReq[] }) {
   const router = useRouter();
   const [updating, setUpdating] = useState<string | null>(null);
+  const [etaTarget, setEtaTarget] = useState<ServiceReq | null>(null);
 
   const handleUpdate = async (
     id: string,
-    status: "new" | "in_progress" | "done" | "cancelled"
+    status: "new" | "in_progress" | "done" | "cancelled",
+    etaMinutes?: number
   ) => {
     setUpdating(id);
-    const result = await updateServiceRequestStatus(id, status);
+    const result = await updateServiceRequestStatus(id, status, etaMinutes);
     if (result.success) {
-      toast.success("Статус обновлён");
+      toast.success(
+        status === "done"
+          ? "Заявка выполнена! Гость уведомлён."
+          : status === "cancelled"
+          ? "Заявка отменена"
+          : "Заявка принята в работу"
+      );
       router.refresh();
     } else {
       toast.error("Ошибка", { description: result.error });
@@ -136,6 +213,7 @@ export function RequestsClient({ requests }: { requests: ServiceReq[] }) {
                     key={req.id}
                     req={req}
                     onUpdate={handleUpdate}
+                    onInProgress={(r) => setEtaTarget(r)}
                     updating={updating}
                   />
                 ))}
@@ -144,6 +222,18 @@ export function RequestsClient({ requests }: { requests: ServiceReq[] }) {
           </TabsContent>
         ))}
       </Tabs>
+
+      <EtaDialog
+        open={!!etaTarget}
+        onClose={() => setEtaTarget(null)}
+        req={etaTarget}
+        onConfirm={(eta) => {
+          if (etaTarget) {
+            setEtaTarget(null);
+            handleUpdate(etaTarget.id, "in_progress", eta);
+          }
+        }}
+      />
     </main>
   );
 }

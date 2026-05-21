@@ -164,7 +164,7 @@ export function WelcomeClient({
         >
           <Button
             size="lg"
-            className="w-full gold-gradient text-white border-0 h-13 text-base"
+            className="w-full gold-gradient text-white border-0 h-14 text-base font-medium py-4"
             onClick={() => router.replace("/guest")}
           >
             Войти в личный кабинет

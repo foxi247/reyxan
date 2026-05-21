@@ -60,7 +60,6 @@ function notify(title: string, body: string) {
 export function AdminRealtimeSync() {
   const router = useRouter();
   const seen = useRef<Set<string>>(new Set());
-  const mountedAt = useRef(Date.now());
 
   // Only notify for events that happened after this component mounted
   const isNew = (id: string, createdAt: string) => {
@@ -102,7 +101,11 @@ export function AdminRealtimeSync() {
             notify("Новая заявка", "Гость ожидает подтверждения");
             toast.info("Новая заявка на заселение!", {
               description: "Гость ожидает подтверждения у ресепшена",
-              duration: 6000,
+              duration: 8000,
+              action: {
+                label: "Открыть",
+                onClick: () => router.push("/admin"),
+              },
             });
             router.refresh();
           }
@@ -116,11 +119,16 @@ export function AdminRealtimeSync() {
             const id = payload.new.id as string;
             const at = payload.new.created_at as string;
             if (!isNew(id, at)) return;
+            const threadId = payload.new.thread_id as string;
             playSound("message");
-            notify("Новое сообщение от гостя", payload.new.message as string ?? "");
+            notify("Новое сообщение от гостя", (payload.new.message as string) ?? "");
             toast.info("Сообщение от гостя", {
               description: (payload.new.message as string)?.slice(0, 80) ?? "",
-              duration: 6000,
+              duration: 8000,
+              action: {
+                label: "Открыть чат",
+                onClick: () => router.push(`/admin/chat?thread=${threadId}`),
+              },
             });
             router.refresh();
           }

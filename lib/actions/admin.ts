@@ -246,17 +246,68 @@ export async function extendGuestStay(
 
 export async function updateServiceRequestStatus(
   id: string,
-  status: "new" | "in_progress" | "done" | "cancelled"
+  status: "new" | "in_progress" | "done" | "cancelled",
+  etaMinutes?: number
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
     const supabase = createAdminClient();
+
     const { error } = await supabase
       .from("service_requests")
       .update({ status, updated_at: new Date().toISOString() })
       .eq("id", id);
 
     if (error) return { success: false, error: "Не удалось обновить статус" };
+
+    // Send automated chat notification to the guest
+    if (status === "in_progress" || status === "done" || status === "cancelled") {
+      const { data: reqRaw } = await supabase
+        .from("service_requests")
+        .select("title, guest_id")
+        .eq("id", id)
+        .single();
+      const req = reqRaw as { title: string; guest_id: string } | null;
+
+      if (req?.guest_id) {
+        const { data: threadRaw } = await supabase
+          .from("chat_threads")
+          .select("id")
+          .eq("guest_id", req.guest_id)
+          .eq("status", "open")
+          .limit(1)
+          .single();
+        const thread = threadRaw as { id: string } | null;
+
+        if (thread) {
+          let text = "";
+          if (status === "in_progress") {
+            text = etaMinutes
+              ? `✅ Заявка «${req.title}» принята в работу. Ориентировочное время ожидания: ~${etaMinutes} мин.`
+              : `✅ Заявка «${req.title}» принята в работу.`;
+          } else if (status === "done") {
+            text = `✅ Заявка «${req.title}» выполнена. Спасибо за обращение!`;
+          } else if (status === "cancelled") {
+            text = `❌ Заявка «${req.title}» отменена. Пожалуйста, обратитесь к администратору.`;
+          }
+
+          if (text) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await supabase.from("chat_messages").insert({
+              thread_id: thread.id,
+              sender_type: "admin",
+              sender_id: null,
+              message: text,
+            } as any);
+            await supabase
+              .from("chat_threads")
+              .update({ last_message_at: new Date().toISOString() })
+              .eq("id", thread.id);
+          }
+        }
+      }
+    }
+
     revalidatePath("/admin/requests");
     return { success: true };
   } catch {

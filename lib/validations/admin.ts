@@ -30,6 +30,7 @@ export const serviceSchema = z.object({
   action_value: z.string().max(500).optional(),
   is_active: z.boolean().default(true),
   sort_order: z.number().int().min(0).default(0),
+  estimated_wait_minutes: z.number().int().min(1).max(999).default(30),
 });
 
 export const hotelSettingsSchema = z.object({

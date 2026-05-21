@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Search,
   Send,
@@ -8,7 +9,6 @@ import {
   ConciergeBell,
   MessageCircle,
   Loader2,
-  User,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -35,9 +35,13 @@ interface AdminChatClientProps {
 }
 
 export function AdminChatClient({ threads, adminId }: AdminChatClientProps) {
-  const [selectedThread, setSelectedThread] = useState<Thread | null>(
-    threads[0] ?? null
-  );
+  const searchParams = useSearchParams();
+  const preselectedId = searchParams.get("thread");
+  const initialThread =
+    (preselectedId && threads.find((t) => t.id === preselectedId)) ||
+    threads[0] ||
+    null;
+  const [selectedThread, setSelectedThread] = useState<Thread | null>(initialThread);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);

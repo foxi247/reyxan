@@ -42,6 +42,7 @@ interface Service {
   action_value: string | null;
   is_active: boolean;
   sort_order: number;
+  estimated_wait_minutes: number;
 }
 
 const ICONS = [
@@ -73,8 +74,9 @@ function ServiceDialog({
             action_value: service.action_value ?? undefined,
             is_active: service.is_active,
             sort_order: service.sort_order,
+            estimated_wait_minutes: service.estimated_wait_minutes ?? 30,
           }
-        : { is_active: true, sort_order: 0, action_type: "request" as const },
+        : { is_active: true, sort_order: 0, action_type: "request" as const, estimated_wait_minutes: 30 },
     });
 
   const onSubmit = async (data: ServiceInput) => {
@@ -144,14 +146,18 @@ function ServiceDialog({
             <Label>URL / Путь (если page или link)</Label>
             <Input placeholder="/guest/menu" {...register("action_value")} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label>Порядок</Label>
               <Input type="number" {...register("sort_order", { valueAsNumber: true })} />
             </div>
             <div className="space-y-1.5">
+              <Label>Ожидание (мин)</Label>
+              <Input type="number" min={1} max={999} {...register("estimated_wait_minutes", { valueAsNumber: true })} />
+            </div>
+            <div className="space-y-1.5">
               <Label>Активен</Label>
-              <div className="flex items-center h-12">
+              <div className="flex items-center h-10">
                 <Switch
                   defaultChecked={service?.is_active ?? true}
                   onCheckedChange={(v) => setValue("is_active", v)}

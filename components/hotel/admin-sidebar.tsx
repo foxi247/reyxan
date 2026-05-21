@@ -10,6 +10,7 @@ import {
   ConciergeBell,
   Utensils,
   UtensilsCrossed,
+  BarChart3,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { href: ROUTES.admin.orders, label: "Заказы еды", Icon: Utensils },
   { href: ROUTES.admin.menu, label: "Меню", Icon: UtensilsCrossed },
   { href: ROUTES.admin.services, label: "Сервисы", Icon: ConciergeBell },
+  { href: ROUTES.admin.analytics, label: "Аналитика", Icon: BarChart3 },
   { href: ROUTES.admin.settings, label: "Настройки", Icon: Settings },
 ];
 
