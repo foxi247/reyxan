@@ -1,7 +1,6 @@
 import { requireAdmin } from "@/lib/auth/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { AdminSidebar } from "@/components/hotel/admin-sidebar";
-import { AdminTopbar } from "@/components/hotel/admin-topbar";
+import { AdminShell } from "@/components/hotel/admin-shell";
 import { MenuClient } from "./menu-client";
 
 async function getMenuData() {
@@ -26,12 +25,8 @@ export default async function AdminMenuPage() {
   const { categories, items } = await getMenuData();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <AdminSidebar adminEmail={admin.email ?? undefined} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <AdminTopbar title="Меню" subtitle="Управление категориями и блюдами" />
-        <MenuClient categories={categories} items={items} />
-      </div>
-    </div>
+    <AdminShell email={admin.email ?? undefined} title="Меню" subtitle="Управление категориями и блюдами">
+      <MenuClient categories={categories} items={items} />
+    </AdminShell>
   );
 }

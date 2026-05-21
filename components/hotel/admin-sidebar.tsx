@@ -11,8 +11,12 @@ import {
   Utensils,
   UtensilsCrossed,
   BarChart3,
+  BedDouble,
+  Sparkles,
+  CalendarPlus,
   Settings,
   LogOut,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HotelLogo } from "@/components/hotel/hotel-logo";
@@ -28,21 +32,33 @@ const NAV_ITEMS = [
   { href: ROUTES.admin.orders, label: "Заказы еды", Icon: Utensils },
   { href: ROUTES.admin.menu, label: "Меню", Icon: UtensilsCrossed },
   { href: ROUTES.admin.services, label: "Сервисы", Icon: ConciergeBell },
+  { href: ROUTES.admin.rooms, label: "Номера", Icon: BedDouble },
+  { href: ROUTES.admin.housekeeping, label: "Уборка", Icon: Sparkles },
+  { href: ROUTES.admin.bookings, label: "Бронирования", Icon: CalendarPlus },
   { href: ROUTES.admin.analytics, label: "Аналитика", Icon: BarChart3 },
   { href: ROUTES.admin.settings, label: "Настройки", Icon: Settings },
 ];
 
 interface AdminSidebarProps {
   adminEmail?: string;
+  onClose?: () => void;
 }
 
-export function AdminSidebar({ adminEmail }: AdminSidebarProps) {
+export function AdminSidebar({ adminEmail, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
 
   return (
     <aside className="flex h-full w-[260px] flex-shrink-0 flex-col border-r border-border bg-card">
       {/* Logo */}
-      <div className="flex flex-col items-center gap-2 border-b border-border px-6 py-6">
+      <div className="relative flex flex-col items-center gap-2 border-b border-border px-6 py-6">
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg hover:bg-accent transition-colors md:hidden"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
         <HotelLogo size="md" />
         <div className="flex items-center gap-2 mt-1">
           <span className="text-xs text-muted-foreground">Админ-панель</span>

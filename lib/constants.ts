@@ -11,6 +11,7 @@ export const ROUTES = {
     menu: "/guest/menu",
     profile: "/guest/profile",
     expired: "/guest/expired",
+    rate: "/guest/rate",
   },
   admin: {
     login: "/admin/login",
@@ -21,6 +22,9 @@ export const ROUTES = {
     orders: "/admin/orders",
     services: "/admin/services",
     menu: "/admin/menu",
+    rooms: "/admin/rooms",
+    housekeeping: "/admin/housekeeping",
+    bookings: "/admin/bookings",
     analytics: "/admin/analytics",
     settings: "/admin/settings",
   },

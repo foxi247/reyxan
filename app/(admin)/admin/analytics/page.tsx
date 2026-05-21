@@ -1,7 +1,6 @@
 import { requireAdmin } from "@/lib/auth/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { AdminSidebar } from "@/components/hotel/admin-sidebar";
-import { AdminTopbar } from "@/components/hotel/admin-topbar";
+import { AdminShell } from "@/components/hotel/admin-shell";
 import { AnalyticsClient } from "./analytics-client";
 
 function groupByDay<T extends { created_at: string }>(
@@ -30,20 +29,24 @@ async function getAnalyticsData() {
     { data: guests30 },
     { data: orders30 },
     { data: serviceReqs30 },
-    { data: allGuests },
-    { data: allOrders },
-    { data: allServiceReqs },
+    { data: allOrdersRev },
     { data: serviceGroups },
     { data: orderStatuses },
+    { data: ratings },
+    { data: activeGuests },
+    { data: rooms },
+    { data: allGuestsRaw },
   ] = await Promise.all([
     supabase.from("guests").select("id, created_at").gte("created_at", since30),
     supabase.from("room_service_orders").select("id, created_at, total, status").gte("created_at", since30),
     supabase.from("service_requests").select("id, created_at, title, status").gte("created_at", since30),
-    supabase.from("guests").select("id", { count: "exact", head: true }),
-    supabase.from("room_service_orders").select("id, total").neq("status", "cancelled"),
-    supabase.from("service_requests").select("id", { count: "exact", head: true }),
+    supabase.from("room_service_orders").select("total").neq("status", "cancelled"),
     supabase.from("service_requests").select("title").gte("created_at", since30),
     supabase.from("room_service_orders").select("status").gte("created_at", since30),
+    supabase.from("guest_ratings").select("rating, comment, created_at"),
+    supabase.from("guests").select("id, check_in, check_out").eq("status", "active"),
+    supabase.from("rooms").select("id, status"),
+    supabase.from("guests").select("id, check_in, check_out, created_at"),
   ]);
 
   // Daily data
@@ -58,9 +61,9 @@ async function getAnalyticsData() {
     serviceRequests: serviceReqsPerDay[date] ?? 0,
   }));
 
-  // Totals
-  const totalRevenue = (allOrders ?? []).reduce((s, o) => s + (Number(o.total) || 0), 0);
-  const completedOrders = (allOrders ?? []).length;
+  // Revenue
+  const totalRevenue = (allOrdersRev ?? []).reduce((s, o) => s + (Number(o.total) || 0), 0);
+  const completedOrders = (allOrdersRev ?? []).length;
 
   // Service type breakdown
   const typeMap: Record<string, number> = {};
@@ -79,17 +82,52 @@ async function getAnalyticsData() {
   }
   const ordersByStatus = Object.entries(statusMap).map(([status, count]) => ({ status, count }));
 
+  // Ratings
+  const ratingsList = (ratings ?? []) as { rating: number; comment: string | null; created_at: string }[];
+  const avgRating = ratingsList.length
+    ? ratingsList.reduce((s, r) => s + r.rating, 0) / ratingsList.length
+    : 0;
+  const ratingDist = [1, 2, 3, 4, 5].map((star) => ({
+    star,
+    count: ratingsList.filter((r) => r.rating === star).length,
+  }));
+
+  // Occupancy
+  const totalRooms = (rooms ?? []).length;
+  const occupiedRooms = (rooms ?? []).filter((r: { status: string }) => r.status === "occupied").length;
+  const occupancyPct = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
+
+  // Avg stay duration from all guests with check_in + check_out
+  const allG = (allGuestsRaw ?? []) as { check_in: string; check_out: string }[];
+  const stayDurations = allG
+    .filter((g) => g.check_in && g.check_out)
+    .map((g) =>
+      (new Date(g.check_out).getTime() - new Date(g.check_in).getTime()) / 86400000
+    )
+    .filter((d) => d > 0);
+  const avgStayDays =
+    stayDurations.length > 0
+      ? stayDurations.reduce((s, d) => s + d, 0) / stayDurations.length
+      : 0;
+
   return {
     daily,
     totals: {
-      totalGuests: (allGuests as unknown as { count: number })?.count ?? 0,
+      totalGuests: (allGuestsRaw ?? []).length,
       totalOrders: completedOrders,
-      totalServiceRequests: (allServiceReqs as unknown as { count: number })?.count ?? 0,
+      totalServiceRequests: (serviceReqs30 ?? []).length,
       totalRevenue,
       avgOrderValue: completedOrders > 0 ? totalRevenue / completedOrders : 0,
+      avgRating: Math.round(avgRating * 10) / 10,
+      totalRatings: ratingsList.length,
+      occupancyPct,
+      occupiedRooms,
+      totalRooms,
+      avgStayDays: Math.round(avgStayDays * 10) / 10,
     },
     serviceTypes,
     ordersByStatus,
+    ratingDist,
     rawGuests: guests30 ?? [],
     rawOrders: orders30 ?? [],
     rawServiceReqs: serviceReqs30 ?? [],
@@ -101,12 +139,8 @@ export default async function AnalyticsPage() {
   const data = await getAnalyticsData();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <AdminSidebar adminEmail={admin.email ?? undefined} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <AdminTopbar title="Аналитика" subtitle="Статистика и отчёты за последние 30 дней" />
-        <AnalyticsClient {...data} />
-      </div>
-    </div>
+    <AdminShell email={admin.email ?? undefined} title="Аналитика" subtitle="Статистика и отчёты за последние 30 дней">
+      <AnalyticsClient {...data} />
+    </AdminShell>
   );
 }

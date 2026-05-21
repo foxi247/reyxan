@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Users, Loader2 } from "lucide-react";
+import { Search, Users, Loader2, Bell } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { completeGuestStay } from "@/lib/actions/admin";
+import { completeGuestStay, sendCheckoutReminder } from "@/lib/actions/admin";
 import { formatDate, formatPhone } from "@/lib/utils";
 import { toast } from "sonner";
 import { GUEST_STATUS_LABELS } from "@/lib/constants";
@@ -33,6 +33,7 @@ export function GuestsClient({ guests }: { guests: Guest[] }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [completing, setCompleting] = useState<string | null>(null);
+  const [reminding, setReminding] = useState<string | null>(null);
 
   const filtered = guests.filter((g) => {
     const q = search.toLowerCase();
@@ -54,6 +55,14 @@ export function GuestsClient({ guests }: { guests: Guest[] }) {
       toast.error("Ошибка", { description: result.error });
     }
     setCompleting(null);
+  };
+
+  const handleReminder = async (id: string) => {
+    setReminding(id);
+    const result = await sendCheckoutReminder(id);
+    if (result.success) toast.success("Напоминание отправлено в чат");
+    else toast.error("Ошибка", { description: result.error });
+    setReminding(null);
   };
 
   return (
@@ -124,19 +133,35 @@ export function GuestsClient({ guests }: { guests: Guest[] }) {
                     <td className="px-5 py-4">{STATUS_BADGE[guest.status]}</td>
                     <td className="px-5 py-4">
                       {guest.status === "active" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 text-xs"
-                          disabled={completing === guest.id}
-                          onClick={() => handleComplete(guest.id)}
-                        >
-                          {completing === guest.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            "Завершить"
-                          )}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs"
+                            title="Напоминание о выезде"
+                            disabled={reminding === guest.id}
+                            onClick={() => handleReminder(guest.id)}
+                          >
+                            {reminding === guest.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Bell className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs"
+                            disabled={completing === guest.id}
+                            onClick={() => handleComplete(guest.id)}
+                          >
+                            {completing === guest.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              "Завершить"
+                            )}
+                          </Button>
+                        </div>
                       )}
                     </td>
                   </tr>

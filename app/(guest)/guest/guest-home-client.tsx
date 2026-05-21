@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, Wifi, Loader2 } from "lucide-react";
+import { CheckCircle, Wifi, Loader2, Star } from "lucide-react";
 import { MobileShell } from "@/components/hotel/mobile-shell";
 import { HotelLogo } from "@/components/hotel/hotel-logo";
 import { ThemeToggle } from "@/components/hotel/theme-toggle";
@@ -153,6 +153,22 @@ export function GuestHomeClient({
             ))}
           </div>
         )}
+      </div>
+
+      {/* Rate your stay */}
+      <div className="px-4 pb-4 -mt-24">
+        <button
+          onClick={() => router.push(ROUTES.guest.rate)}
+          className="w-full flex items-center gap-3 rounded-2xl border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/80 dark:bg-amber-900/20 px-5 py-4 text-left hover:bg-amber-100/80 dark:hover:bg-amber-900/30 transition-colors"
+        >
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-800/40">
+            <Star className="h-5 w-5 text-amber-500 dark:text-amber-400" />
+          </div>
+          <div>
+            <div className="font-medium text-sm">Оценить пребывание</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Поделитесь впечатлениями</div>
+          </div>
+        </button>
       </div>
 
       {/* Wi-Fi Modal */}

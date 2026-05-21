@@ -1,7 +1,6 @@
 import { requireAdmin } from "@/lib/auth/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { AdminSidebar } from "@/components/hotel/admin-sidebar";
-import { AdminTopbar } from "@/components/hotel/admin-topbar";
+import { AdminShell } from "@/components/hotel/admin-shell";
 import { GuestsClient } from "./guests-client";
 
 async function getGuests() {
@@ -18,12 +17,8 @@ export default async function AdminGuestsPage() {
   const guests = await getGuests();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <AdminSidebar adminEmail={admin.email ?? undefined} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <AdminTopbar title="Гости" subtitle="Управление проживающими гостями" />
-        <GuestsClient guests={guests as any} />
-      </div>
-    </div>
+    <AdminShell email={admin.email ?? undefined} title="Гости" subtitle="Управление проживающими гостями">
+      <GuestsClient guests={guests as any} />
+    </AdminShell>
   );
 }

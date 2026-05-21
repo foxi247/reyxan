@@ -1,7 +1,6 @@
 import { requireAdmin } from "@/lib/auth/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { AdminSidebar } from "@/components/hotel/admin-sidebar";
-import { AdminTopbar } from "@/components/hotel/admin-topbar";
+import { AdminShell } from "@/components/hotel/admin-shell";
 import { StatCard } from "@/components/hotel/stat-card";
 import { Users, Clock, ConciergeBell, Utensils } from "lucide-react";
 import { DashboardRequests } from "./dashboard-requests";
@@ -49,12 +48,7 @@ export default async function AdminDashboardPage() {
     await getDashboardData();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <AdminSidebar adminEmail={admin.email ?? undefined} />
-
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <AdminTopbar title="Dashboard" subtitle="Обзор отеля в реальном времени" />
-
+    <AdminShell email={admin.email ?? undefined} title="Dashboard" subtitle="Обзор отеля в реальном времени">
         <main className="flex-1 overflow-y-auto p-6">
           {/* Stats */}
           <div className="grid grid-cols-4 gap-4 mb-6">
@@ -96,7 +90,6 @@ export default async function AdminDashboardPage() {
 
           <DashboardServiceRequests requests={recentServiceReqs as any} />
         </main>
-      </div>
-    </div>
+    </AdminShell>
   );
 }

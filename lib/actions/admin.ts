@@ -622,3 +622,134 @@ export async function fullSystemReset(): Promise<ActionResult> {
     return { success: true };
   } catch { return { success: false, error: "Не удалось выполнить полный сброс" }; }
 }
+
+// ── Rooms ──────────────────────────────────────────────────────
+
+export async function updateRoomStatus(
+  roomId: string,
+  status: "available" | "occupied" | "maintenance"
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from("rooms")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", roomId);
+    if (error) return { success: false, error: "Не удалось обновить статус" };
+    revalidatePath("/admin/rooms");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+// ── Housekeeping ───────────────────────────────────────────────
+
+export async function scheduleRoomCleaning(roomId: string): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    const today = new Date().toISOString().slice(0, 10);
+    // Upsert — avoid duplicate for same room + day
+    const { data: existing } = await supabase
+      .from("cleaning_records")
+      .select("id")
+      .eq("room_id", roomId)
+      .eq("scheduled_date", today)
+      .limit(1)
+      .single();
+    if (existing) return { success: true }; // already scheduled
+    const { error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from("cleaning_records").insert({ room_id: roomId, scheduled_date: today } as any);
+    if (error) return { success: false, error: "Не удалось запланировать уборку" };
+    revalidatePath("/admin/housekeeping");
+    revalidatePath("/admin/rooms");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+export async function updateCleaningStatus(
+  recordId: string,
+  status: "pending" | "in_progress" | "done" | "skipped",
+  notes?: string
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    const update: Record<string, unknown> = { status };
+    if (notes !== undefined) update.notes = notes;
+    if (status === "done") update.completed_at = new Date().toISOString();
+    const { error } = await supabase
+      .from("cleaning_records")
+      .update(update)
+      .eq("id", recordId);
+    if (error) return { success: false, error: "Не удалось обновить статус уборки" };
+    revalidatePath("/admin/housekeeping");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+// ── Checkout reminder ──────────────────────────────────────────
+
+export async function sendCheckoutReminder(guestId: string): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    const { data: guestRaw } = await supabase
+      .from("guests")
+      .select("first_name, check_out")
+      .eq("id", guestId)
+      .single();
+    const guest = guestRaw as { first_name: string; check_out: string } | null;
+    if (!guest) return { success: false, error: "Гость не найден" };
+
+    const { data: threadRaw } = await supabase
+      .from("chat_threads")
+      .select("id")
+      .eq("guest_id", guestId)
+      .eq("status", "open")
+      .limit(1)
+      .single();
+    const thread = threadRaw as { id: string } | null;
+    if (!thread) return { success: false, error: "Чат не найден" };
+
+    const checkOutDate = new Date(guest.check_out).toLocaleDateString("ru-RU", {
+      day: "numeric", month: "long",
+    });
+    const text = `🔔 Напоминание: уважаемый(ая) ${guest.first_name}, ваш выезд запланирован на ${checkOutDate}. Пожалуйста, освободите номер до 12:00. Если вам нужна помощь с багажом или продление — сообщите нам.`;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await supabase.from("chat_messages").insert({
+      thread_id: thread.id,
+      sender_type: "admin",
+      sender_id: null,
+      message: text,
+    } as any);
+    await supabase
+      .from("chat_threads")
+      .update({ last_message_at: new Date().toISOString() })
+      .eq("id", thread.id);
+
+    revalidatePath("/admin/guests");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
+
+// ── Pre-bookings ───────────────────────────────────────────────
+
+export async function updatePreBookingStatus(
+  id: string,
+  status: "pending" | "confirmed" | "cancelled" | "arrived"
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from("pre_bookings")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) return { success: false, error: "Не удалось обновить статус" };
+    revalidatePath("/admin/bookings");
+    return { success: true };
+  } catch { return { success: false, error: "Произошла ошибка" }; }
+}
