@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { Tv2, BedDouble, Sparkles } from "lucide-react";
 
 type RoomStatus = "available" | "occupied" | "maintenance";
@@ -20,13 +19,14 @@ interface Room {
 }
 
 export function TvConnectClient({ rooms }: { rooms: Room[] }) {
-  const router = useRouter();
-
-  const handleConnect = (roomNumber: string) => {
-    if (typeof window !== "undefined") {
+  const saveAndGo = (e: React.MouseEvent<HTMLAnchorElement>, roomNumber: string) => {
+    try {
       localStorage.setItem("reyxan_tv_room_number", roomNumber);
+    } catch {
+      // localStorage unavailable — navigation still works via href
     }
-    router.push(`/tv/room/${roomNumber}`);
+    // Let the href handle actual navigation
+    void e;
   };
 
   return (
@@ -49,52 +49,57 @@ export function TvConnectClient({ rooms }: { rooms: Room[] }) {
           <div className="flex flex-col items-center justify-center h-64 text-white/30 gap-4">
             <BedDouble className="h-16 w-16" />
             <p className="text-2xl">Номера не найдены</p>
+            <p className="text-lg">Добавьте номера в админ-панели</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
             {rooms.map((room) => {
               const st = STATUS_CONFIG[room.status];
               return (
-                <button
+                <a
                   key={room.id}
-                  onClick={() => handleConnect(room.number)}
+                  href={`/tv/room/${room.number}`}
+                  onClick={(e) => saveAndGo(e, room.number)}
                   className="
                     group flex flex-col gap-4 p-6 rounded-3xl
-                    bg-white/5 border border-white/10
-                    hover:bg-amber-400/10 hover:border-amber-400/40
+                    bg-white/5 border-2 border-white/10
+                    hover:bg-amber-400/10 hover:border-amber-400/50
+                    focus:bg-amber-400/10 focus:border-amber-400/70
                     active:scale-95
                     transition-all duration-150 text-left
-                    focus:outline-none focus:ring-2 focus:ring-amber-400/60
+                    outline-none focus:ring-4 focus:ring-amber-400/30
+                    cursor-pointer no-underline
                   "
+                  tabIndex={0}
                 >
-                  {/* Room number */}
-                  <div className="font-serif text-6xl font-light leading-none text-white/90 group-hover:text-amber-300 transition-colors">
+                  {/* Room number — large for TV */}
+                  <div className="font-serif text-7xl font-light leading-none text-white/90 group-hover:text-amber-300 group-focus:text-amber-300 transition-colors">
                     {room.number}
                   </div>
 
                   {/* Theme name */}
                   {room.theme_name ? (
-                    <div className="flex items-center gap-1.5 text-sm text-amber-400/80">
-                      <Sparkles className="h-3.5 w-3.5 flex-shrink-0" />
+                    <div className="flex items-center gap-1.5 text-base text-amber-400/80">
+                      <Sparkles className="h-4 w-4 flex-shrink-0" />
                       <span className="leading-snug">{room.theme_name}</span>
                     </div>
                   ) : (
                     room.floor && (
-                      <div className="text-sm text-white/30">{room.floor} этаж</div>
+                      <div className="text-base text-white/30">{room.floor} этаж</div>
                     )
                   )}
 
                   {/* Status */}
                   <div className="flex items-center gap-2">
-                    <div className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${st.dot}`} />
-                    <span className="text-sm text-white/50">{st.label}</span>
+                    <div className={`h-3 w-3 rounded-full flex-shrink-0 ${st.dot}`} />
+                    <span className="text-base text-white/50">{st.label}</span>
                   </div>
 
                   {/* Connect label */}
-                  <div className="mt-auto pt-2 text-sm font-medium text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="mt-auto pt-2 text-base font-medium text-amber-400 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
                     Подключить →
                   </div>
-                </button>
+                </a>
               );
             })}
           </div>
