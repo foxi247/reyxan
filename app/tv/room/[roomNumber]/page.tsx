@@ -174,52 +174,36 @@ const C_MUTED  = "rgba(26,16,5,.38)";
 const CARD_BG  = "#ffffff";
 const FONT_SERIF = "var(--font-playfair,serif)";
 
-/* Safe-zone wrapper — 5% top/bottom, 6% left/right */
-function Safe({ children, style = {}, center = false }: {
-  children: React.ReactNode;
-  style?: React.CSSProperties;
-  center?: boolean;
-}) {
-  return (
-    <div style={{
-      position:"absolute", inset:0,
-      padding:"5% 6%",
-      display:"flex",
-      flexDirection: center ? "column" : undefined,
-      alignItems: center ? "center" : undefined,
-      justifyContent: center ? "center" : undefined,
-      ...style,
-    }}>
-      {children}
-    </div>
-  );
-}
 
 function IdleScreen({ hotelName, roomNumber }: { hotelName: string; roomNumber: string }) {
   return (
-    <div style={{ width:"100%", height:"100%", position:"relative", background:`radial-gradient(ellipse at 50% 35%,rgba(196,147,40,.07) 0%,transparent 60%), ${BG_CREAM}` }}>
-      <Safe center style={{ gap:28, textAlign:"center" }}>
-        <div className="breath" style={{ lineHeight:0 }}>
-          <Ornament size={88} ring />
+    <div style={{
+      width:"100%", height:"100%", position:"relative",
+      display:"flex", flexDirection:"column",
+      alignItems:"center", justifyContent:"center",
+      gap:28, textAlign:"center",
+      background:`radial-gradient(ellipse at 50% 35%,rgba(196,147,40,.07) 0%,transparent 60%), ${BG_CREAM}`,
+    }}>
+      <div className="breath" style={{ lineHeight:0 }}>
+        <Ornament size={88} ring />
+      </div>
+
+      <div className="a1" style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
+        <div style={{ fontFamily:FONT_SERIF, fontSize:"5.5rem", fontWeight:300, letterSpacing:"0.06em", color:C_DARK, lineHeight:1 }}>
+          {hotelName}
         </div>
-
-        <div className="a1" style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
-          <div style={{ fontFamily:FONT_SERIF, fontSize:"5.5rem", fontWeight:300, letterSpacing:"0.06em", color:C_DARK, lineHeight:1 }}>
-            {hotelName}
-          </div>
-          <div style={{ letterSpacing:"0.4em", fontSize:"0.85rem", textTransform:"uppercase", color:C_GOLD }}>
-            Добро пожаловать
-          </div>
+        <div style={{ letterSpacing:"0.4em", fontSize:"0.85rem", textTransform:"uppercase", color:C_GOLD }}>
+          Добро пожаловать
         </div>
+      </div>
 
-        <div className="a2" style={{ width:240 }}><Divider /></div>
+      <div className="a2" style={{ width:240 }}><Divider /></div>
 
-        <div className="a3"><StarRow baseDelay={0.3} /></div>
+      <div className="a3"><StarRow baseDelay={0.3} /></div>
 
-        <div className="a4 pulse" style={{ letterSpacing:"0.3em", fontSize:"0.8rem", textTransform:"uppercase", color:"rgba(26,16,5,.22)" }}>
-          Ожидание гостя
-        </div>
-      </Safe>
+      <div className="a4 pulse" style={{ letterSpacing:"0.3em", fontSize:"0.8rem", textTransform:"uppercase", color:"rgba(26,16,5,.22)" }}>
+        Ожидание гостя
+      </div>
 
       <div className="aF" style={{ position:"absolute", bottom:"5%", right:"6%", letterSpacing:"0.2em", fontSize:"0.8rem", textTransform:"uppercase", color:"rgba(26,16,5,.18)" }}>
         Номер {roomNumber}
