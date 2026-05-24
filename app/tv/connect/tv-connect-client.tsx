@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { Tv2, BedDouble, Sparkles, Loader2 } from "lucide-react";
+import { Tv2, BedDouble, Loader2 } from "lucide-react";
 
 type RoomStatus = "available" | "occupied" | "maintenance";
 
@@ -17,26 +17,44 @@ interface Room {
   number: string;
   floor: number | null;
   status: RoomStatus;
-  theme_name: string | null;
 }
 
 export function ClientPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-    supabase
-      .from("rooms")
-      .select("id, number, floor, status, theme_name")
-      .order("number")
-      .then(({ data }) => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) {
+      setFetchError("Supabase не настроен (нет env переменных)");
+      setLoading(false);
+      return;
+    }
+    const supabase = createBrowserClient(url, key);
+    const timer = setTimeout(() => {
+      setFetchError("Превышено время ожидания. Проверьте соединение.");
+      setLoading(false);
+    }, 10000);
+
+    Promise.resolve(
+      supabase.from("rooms").select("id, number, floor, status").order("number")
+    ).then(({ data, error }) => {
+      clearTimeout(timer);
+      if (error) {
+        setFetchError(`Ошибка: ${error.message}`);
+      } else {
         setRooms((data ?? []) as Room[]);
-        setLoading(false);
-      });
+      }
+      setLoading(false);
+    }).catch((e: unknown) => {
+      clearTimeout(timer);
+      setFetchError(e instanceof Error ? e.message : "Ошибка соединения");
+      setLoading(false);
+    });
+
+    return () => clearTimeout(timer);
   }, []);
 
   const handleConnect = (roomNumber: string) => {
@@ -67,6 +85,17 @@ export function ClientPage() {
             <Loader2 className="h-12 w-12 animate-spin" />
             <p className="text-xl">Загрузка номеров…</p>
           </div>
+        ) : fetchError ? (
+          <div className="flex flex-col items-center justify-center h-64 gap-4 text-red-400 text-center">
+            <p className="text-2xl">⚠️ Не удалось загрузить</p>
+            <p className="text-base text-white/40 max-w-md">{fetchError}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 px-8 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-lg transition-colors"
+            >
+              Попробовать снова
+            </button>
+          </div>
         ) : rooms.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-white/30 gap-4">
             <BedDouble className="h-16 w-16" />
@@ -96,12 +125,7 @@ export function ClientPage() {
                     {room.number}
                   </div>
 
-                  {room.theme_name ? (
-                    <div className="flex items-center gap-1.5 text-base text-amber-400/80">
-                      <Sparkles className="h-4 w-4 flex-shrink-0" />
-                      <span className="leading-snug">{room.theme_name}</span>
-                    </div>
-                  ) : room.floor ? (
+                  {room.floor ? (
                     <div className="text-base text-white/30">{room.floor} этаж</div>
                   ) : null}
 
