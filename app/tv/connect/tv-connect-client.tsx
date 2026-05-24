@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Tv2, BedDouble, Loader2 } from "lucide-react";
+import { Tv2, BedDouble } from "lucide-react";
 
 type RoomStatus = "available" | "occupied" | "maintenance";
 
-const STATUS_CONFIG: Record<RoomStatus, { label: string; dot: string }> = {
+const STATUS_CONFIG: Record<string, { label: string; dot: string }> = {
   available:   { label: "Свободен",     dot: "bg-emerald-400" },
   occupied:    { label: "Занят",        dot: "bg-amber-400"   },
   maintenance: { label: "Обслуживание", dot: "bg-red-400"     },
@@ -15,36 +14,11 @@ interface Room {
   id: string;
   number: string;
   floor: number | null;
-  status: RoomStatus;
+  status: string;
 }
 
-export function ClientPage() {
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setFetchError(true);
-      setLoading(false);
-    }, 8000);
-
-    fetch("/api/tv/rooms")
-      .then((r) => r.json())
-      .then(({ rooms: data }) => {
-        clearTimeout(timer);
-        setRooms(data ?? []);
-        setLoading(false);
-      })
-      .catch(() => {
-        clearTimeout(timer);
-        setFetchError(true);
-        setLoading(false);
-      });
-
-    return () => clearTimeout(timer);
-  }, []);
-
+// Rooms arrive pre-rendered from server — no fetch, no loading state
+export function TvConnectClient({ rooms }: { rooms: Room[] }) {
   const handleConnect = (roomNumber: string) => {
     try { localStorage.setItem("reyxan_tv_room_number", roomNumber); } catch { /* ignore */ }
     window.location.href = "/tv/room";
@@ -53,7 +27,6 @@ export function ClientPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
 
-      {/* Header */}
       <div className="flex flex-col items-center justify-center pt-16 pb-10 px-8 text-center">
         <div className="flex items-center gap-3 mb-6">
           <Tv2 className="h-10 w-10 text-amber-400" />
@@ -65,35 +38,17 @@ export function ClientPage() {
         </p>
       </div>
 
-      {/* Content */}
       <div className="flex-1 max-w-5xl mx-auto w-full px-8 pb-16">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center h-64 gap-4 text-white/40">
-            <Loader2 className="h-12 w-12 animate-spin" />
-            <p className="text-xl">Загрузка номеров…</p>
-          </div>
-
-        ) : fetchError ? (
-          <div className="flex flex-col items-center justify-center h-64 gap-6 text-center">
-            <p className="text-2xl text-white/50">Не удалось загрузить список номеров</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-8 py-4 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-xl transition-colors"
-            >
-              Попробовать снова
-            </button>
-          </div>
-
-        ) : rooms.length === 0 ? (
+        {rooms.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-white/30 gap-4">
             <BedDouble className="h-16 w-16" />
             <p className="text-2xl">Нет доступных номеров</p>
+            <p className="text-lg">Добавьте номера в админ-панели</p>
           </div>
-
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
             {rooms.map((room) => {
-              const st = STATUS_CONFIG[room.status];
+              const st = STATUS_CONFIG[room.status] ?? STATUS_CONFIG.available;
               return (
                 <button
                   key={room.id}
