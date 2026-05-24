@@ -17,13 +17,7 @@ interface Room {
   status: string;
 }
 
-// Rooms arrive pre-rendered from server — no fetch, no loading state
 export function TvConnectClient({ rooms }: { rooms: Room[] }) {
-  const handleConnect = (roomNumber: string) => {
-    try { localStorage.setItem("reyxan_tv_room_number", roomNumber); } catch { /* ignore */ }
-    window.location.href = "/tv/room";
-  };
-
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
 
@@ -50,21 +44,21 @@ export function TvConnectClient({ rooms }: { rooms: Room[] }) {
             {rooms.map((room) => {
               const st = STATUS_CONFIG[room.status] ?? STATUS_CONFIG.available;
               return (
-                <button
+                /* Plain <a href> — works without any JavaScript */
+                <a
                   key={room.id}
-                  onClick={() => handleConnect(room.number)}
+                  href={`/tv/room/${room.number}`}
                   className="
-                    group flex flex-col gap-4 p-6 rounded-3xl
+                    flex flex-col gap-4 p-6 rounded-3xl no-underline
                     bg-white/5 border-2 border-white/10
                     hover:bg-amber-400/10 hover:border-amber-400/50
                     focus:bg-amber-400/10 focus:border-amber-400/70
-                    active:scale-95 active:bg-amber-400/20
-                    transition-all duration-150 text-left
+                    active:bg-amber-400/20
+                    transition-all duration-150
                     outline-none focus:ring-4 focus:ring-amber-400/30
-                    cursor-pointer
                   "
                 >
-                  <div className="font-serif text-7xl font-light leading-none text-white/90 group-hover:text-amber-300 group-focus:text-amber-300 transition-colors">
+                  <div className="font-serif text-7xl font-light leading-none text-white/90">
                     {room.number}
                   </div>
 
@@ -77,10 +71,10 @@ export function TvConnectClient({ rooms }: { rooms: Room[] }) {
                     <span className="text-base text-white/50">{st.label}</span>
                   </div>
 
-                  <div className="mt-auto pt-2 text-base font-medium text-amber-400 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
+                  <div className="mt-auto pt-2 text-base font-medium text-amber-400">
                     Подключить →
                   </div>
-                </button>
+                </a>
               );
             })}
           </div>
@@ -89,3 +83,4 @@ export function TvConnectClient({ rooms }: { rooms: Room[] }) {
     </div>
   );
 }
+
