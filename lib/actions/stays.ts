@@ -20,7 +20,8 @@ export type TvState =
 
 export interface CheckInData {
   roomId: string;
-  checkOutDate: string; // YYYY-MM-DD
+  checkInDate?: string;  // YYYY-MM-DD, defaults to today
+  checkOutDate: string;  // YYYY-MM-DD
   guests: { firstName: string; lastName: string; phone?: string; isPrimary?: boolean }[];
 }
 
@@ -33,7 +34,8 @@ export async function checkInRoom(
   try {
     await requireAdmin();
 
-    const { roomId, checkOutDate, guests } = data;
+    const { roomId, checkInDate, checkOutDate, guests } = data;
+    const checkInStr = checkInDate ?? new Date().toISOString().slice(0, 10);
     if (!guests.length) return { success: false, error: "Укажите хотя бы одного гостя" };
 
     const supabase = createAdminClient();
@@ -67,7 +69,7 @@ export async function checkInRoom(
         last_name: primary.lastName,
         phone: primary.phone ?? `hotel-ci-${crypto.randomBytes(4).toString("hex")}`,
         room_id: roomId,
-        check_in: new Date().toISOString().slice(0, 10),
+        check_in: checkInStr,
         check_out: checkOutDate,
         status: "active",
         access_token_hash: guestTokenHash,

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BedDouble, Sparkles, Wrench, CheckCircle2, Clock, Loader2, AlertCircle,
-  Plus, Pencil, Trash2, X, Upload, Tv2, LogIn, LogOut, Users,
+  Plus, Pencil, Trash2, X, Upload, Tv2, LogIn, LogOut, Users, QrCode,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -86,7 +86,7 @@ const emptyForm = {
   photo_url: "",
 };
 
-const emptyGuest = { firstName: "", lastName: "", phone: "" };
+const emptyGuest = { firstName: "", lastName: "" };
 
 // ---------------------------------------------------------------------------
 // RoomCard
@@ -238,21 +238,10 @@ function RoomCard({
 
         {/* TV action buttons */}
         <div className="flex gap-2 flex-wrap">
-          {!stay && room.status === "occupied" && (
+          {!stay && (
             <Button
               size="sm"
-              variant="cream"
-              className="h-7 text-xs gap-1 flex-1"
-              onClick={() => onCheckIn(room)}
-            >
-              <LogIn className="h-3 w-3" />
-              Заселить
-            </Button>
-          )}
-          {!stay && room.status === "available" && (
-            <Button
-              size="sm"
-              variant="outline"
+              variant={room.status === "occupied" ? "cream" : "outline"}
               className="h-7 text-xs gap-1 flex-1"
               onClick={() => onCheckIn(room)}
             >
@@ -266,7 +255,6 @@ function RoomCard({
                 href={`/tv/room/${room.number}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => { try { localStorage.setItem("reyxan_tv_room_number", room.number); } catch { /**/ } }}
                 className="inline-flex items-center gap-1 h-7 px-2.5 text-xs rounded-xl border border-border bg-background hover:bg-secondary transition-colors"
               >
                 <Tv2 className="h-3 w-3" />
@@ -308,48 +296,34 @@ function CheckInDialog({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [guests, setGuests] = useState([{ ...emptyGuest }]);
+  const today = new Date().toISOString().slice(0, 10);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [checkIn, setCheckIn] = useState(today);
   const [checkOut, setCheckOut] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const today = new Date().toISOString().slice(0, 10);
-
-  const addGuest = () => {
-    if (guests.length < 4) setGuests((g) => [...g, { ...emptyGuest }]);
-  };
-  const removeGuest = (i: number) => setGuests((g) => g.filter((_, idx) => idx !== i));
-  const updateGuest = (i: number, field: keyof typeof emptyGuest, val: string) => {
-    setGuests((g) => g.map((gst, idx) => idx === i ? { ...gst, [field]: val } : gst));
-  };
+  const [qrToken, setQrToken] = useState<string | null>(null);
 
   const handleSave = async () => {
     if (!room) return;
+    if (!firstName.trim() || !lastName.trim()) { setError("Укажите имя и фамилию гостя"); return; }
     if (!checkOut) { setError("Укажите дату выезда"); return; }
-    if (!guests[0].firstName || !guests[0].lastName) {
-      setError("Укажите имя и фамилию основного гостя");
-      return;
-    }
+    if (checkOut <= checkIn) { setError("Дата выезда должна быть позже даты въезда"); return; }
     setSaving(true);
     setError(null);
 
     const result = await checkInRoom({
       roomId: room.id,
+      checkInDate: checkIn,
       checkOutDate: checkOut,
-      guests: guests
-        .filter((g) => g.firstName || g.lastName)
-        .map((g, i) => ({
-          firstName: g.firstName,
-          lastName: g.lastName,
-          phone: g.phone || undefined,
-          isPrimary: i === 0,
-        })),
+      guests: [{ firstName: firstName.trim(), lastName: lastName.trim(), isPrimary: true }],
     });
 
-    if (result.success) {
+    if (result.success && result.data) {
       toast.success("Гость заселён");
       onSuccess();
-      onClose();
+      setQrToken(result.data.accessToken);
     } else {
       setError(result.error ?? "Ошибка заселения");
     }
@@ -357,98 +331,126 @@ function CheckInDialog({
   };
 
   const handleClose = () => {
-    setGuests([{ ...emptyGuest }]);
+    setFirstName("");
+    setLastName("");
+    setCheckIn(today);
     setCheckOut("");
     setError(null);
+    setQrToken(null);
     onClose();
   };
+
+  const qrUrl = qrToken
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/guest/access?token=${qrToken}`
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <LogIn className="h-4 w-4" />
-            Заселение · Номер {room?.number}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4 py-2">
-          {/* Check-out date */}
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Дата выезда <span className="text-red-500">*</span></label>
-            <Input
-              type="date"
-              min={today}
-              value={checkOut}
-              onChange={(e) => setCheckOut(e.target.value)}
-            />
-          </div>
-
-          {/* Guests */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Гости</label>
-              {guests.length < 4 && (
-                <button
-                  type="button"
-                  onClick={addGuest}
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                  <Plus className="h-3 w-3" /> Добавить гостя
-                </button>
-              )}
+        {qrToken ? (
+          /* ---- QR success screen ---- */
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-hotel-green">
+                <CheckCircle2 className="h-4 w-4" />
+                Гость заселён · Номер {room?.number}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col items-center gap-4 py-4">
+              <p className="text-sm text-muted-foreground text-center">
+                Покажите QR-код гостю — он откроет доступ к сервисам отеля
+              </p>
+              <div className="bg-white rounded-2xl p-3 shadow-md">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrUrl ?? "")}&bgcolor=ffffff&color=0a0a0a&margin=0`}
+                  alt="QR"
+                  width={220}
+                  height={220}
+                  className="rounded-xl"
+                />
+              </div>
+              <div className="text-center space-y-1">
+                <p className="font-medium">{firstName} {lastName}</p>
+                <p className="text-xs text-muted-foreground">
+                  Номер {room?.number} · Выезд {new Date(checkOut).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+                </p>
+              </div>
             </div>
-            {guests.map((g, i) => (
-              <div key={i} className="bg-secondary/50 rounded-xl p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Users className="h-3 w-3" />
-                    {i === 0 ? "Основной гость" : `Гость ${i + 1}`}
-                  </div>
-                  {i > 0 && (
-                    <button onClick={() => removeGuest(i)} className="text-muted-foreground hover:text-destructive">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
+            <DialogFooter>
+              <Button onClick={handleClose} className="w-full gold-gradient text-white border-0">
+                Готово
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          /* ---- Check-in form ---- */
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <LogIn className="h-4 w-4" />
+                Заселение · Номер {room?.number}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              {/* Guest name */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                  Гость
+                </label>
                 <div className="grid grid-cols-2 gap-2">
                   <Input
                     placeholder="Имя *"
-                    value={g.firstName}
-                    onChange={(e) => updateGuest(i, "firstName", e.target.value)}
-                    className="h-8 text-xs"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    autoFocus
                   />
                   <Input
                     placeholder="Фамилия *"
-                    value={g.lastName}
-                    onChange={(e) => updateGuest(i, "lastName", e.target.value)}
-                    className="h-8 text-xs"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
                   />
                 </div>
-                <Input
-                  placeholder="Телефон (необязательно)"
-                  value={g.phone}
-                  onChange={(e) => updateGuest(i, "phone", e.target.value)}
-                  className="h-8 text-xs"
-                />
               </div>
-            ))}
-          </div>
 
-          {error && (
-            <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-xl px-3 py-2">
-              {error}
-            </p>
-          )}
-        </div>
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Въезд</label>
+                  <Input
+                    type="date"
+                    value={checkIn}
+                    onChange={(e) => setCheckIn(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Выезд <span className="text-red-500">*</span></label>
+                  <Input
+                    type="date"
+                    min={checkIn}
+                    value={checkOut}
+                    onChange={(e) => setCheckOut(e.target.value)}
+                  />
+                </div>
+              </div>
 
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={handleClose} disabled={saving}>Отмена</Button>
-          <Button onClick={handleSave} disabled={saving} className="gold-gradient text-white border-0">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><LogIn className="h-4 w-4" /> Заселить</>}
-          </Button>
-        </DialogFooter>
+              {error && (
+                <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-xl px-3 py-2">
+                  {error}
+                </p>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={handleClose} disabled={saving}>Отмена</Button>
+              <Button onClick={handleSave} disabled={saving} className="gold-gradient text-white border-0">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><LogIn className="h-4 w-4 mr-1" /> Заселить</>}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
