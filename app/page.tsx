@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { HotelLogo } from "@/components/hotel/hotel-logo";
 import { ThemeToggle } from "@/components/hotel/theme-toggle";
+import { TvConnectButton } from "@/components/hotel/tv-connect-button";
 import {
   Sparkles, Star, Wifi, Utensils, ConciergeBell, BedDouble,
   Phone, MapPin, ArrowRight, CalendarCheck,
@@ -70,6 +71,7 @@ export default function LandingPage() {
                 <CalendarCheck className="h-5 w-5" /> Забронировать номер
               </Link>
             </div>
+            <TvConnectButton />
           </div>
         </div>
 

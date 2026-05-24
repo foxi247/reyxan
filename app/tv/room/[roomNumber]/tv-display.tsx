@@ -384,8 +384,15 @@ export function TvDisplay({ roomNumber }: { roomNumber: string }) {
 
   if (error) {
     return (
-      <div className="w-screen h-screen bg-black flex items-center justify-center text-white text-3xl">
-        {error}
+      <div className="w-screen h-screen bg-black flex flex-col items-center justify-center gap-8 text-white">
+        <div className="text-5xl">📺</div>
+        <p className="text-3xl text-white/60">{error}</p>
+        <button
+          onClick={() => { localStorage.removeItem("reyxan_tv_room_number"); window.location.href = "/tv/connect"; }}
+          className="px-8 py-4 rounded-2xl bg-amber-400/20 border border-amber-400/40 text-amber-300 text-xl hover:bg-amber-400/30 transition-colors"
+        >
+          Выбрать другой номер
+        </button>
       </div>
     );
   }
@@ -408,8 +415,15 @@ export function TvDisplay({ roomNumber }: { roomNumber: string }) {
     }).then(() => fetchState());
   };
 
+  const handleChangeRoom = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("reyxan_tv_room_number");
+    }
+    window.location.href = "/tv/connect";
+  };
+
   return (
-    <div className="w-screen h-screen overflow-hidden bg-black text-white font-sans select-none">
+    <div className="w-screen h-screen overflow-hidden bg-black text-white font-sans select-none relative">
       {data.state === "idle" && (
         <IdleScreen hotelName={data.hotelName} bgUrl={data.room.tv_background_url} />
       )}
@@ -431,6 +445,14 @@ export function TvDisplay({ roomNumber }: { roomNumber: string }) {
       {data.state === "session_closing" && (
         <SessionClosingScreen timeLeft={timeLeft} />
       )}
+
+      {/* Change room button — always visible in corner */}
+      <button
+        onClick={handleChangeRoom}
+        className="absolute bottom-5 right-5 z-50 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/30 hover:text-white/70 text-sm transition-all duration-200"
+      >
+        Сменить номер
+      </button>
     </div>
   );
 }
