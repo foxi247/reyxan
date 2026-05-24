@@ -1,12 +1,7 @@
-import webpush from "web-push";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY ?? "";
-
-if (VAPID_PUBLIC && VAPID_PRIVATE) {
-  webpush.setVapidDetails("mailto:admin@hotel-reyhan.ru", VAPID_PUBLIC, VAPID_PRIVATE);
-}
 
 export async function sendPushToGuest(
   guestId: string,
@@ -14,6 +9,9 @@ export async function sendPushToGuest(
 ) {
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
   try {
+    const webpush = (await import("web-push")).default;
+    webpush.setVapidDetails("mailto:admin@hotel-reyhan.ru", VAPID_PUBLIC, VAPID_PRIVATE);
+
     const supabase = createAdminClient();
     const { data: subs } = await supabase
       .from("push_subscriptions")
@@ -30,7 +28,6 @@ export async function sendPushToGuest(
           payloadStr
         ).catch(async (err: { statusCode?: number }) => {
           if (err.statusCode === 410 || err.statusCode === 404) {
-            // Subscription expired — remove it
             await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
           }
         })

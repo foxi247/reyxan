@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BedDouble, Sparkles, Wrench, CheckCircle2, Clock, Loader2, AlertCircle,
-  Plus, Pencil, Trash2, X, Upload,
+  Plus, Pencil, Trash2, X, Upload, Tv2, LogIn, LogOut, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ import {
   updateRoomStatus, scheduleRoomCleaning,
   createRoom, updateRoom, deleteRoom,
 } from "@/lib/actions/admin";
+import { checkInRoom, checkOutRoom } from "@/lib/actions/stays";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -35,10 +36,18 @@ interface Room {
   photo_url: string | null;
 }
 
+interface StayInfo {
+  stayId: string;
+  tvState: string;
+  checkOut: string;
+  primaryGuest: string | null;
+}
+
 interface Props {
   rooms: Room[];
   guestMap: Record<string, { name: string; checkOut: string; guestId: string }>;
   cleaningMap: Record<string, string>;
+  stayMap: Record<string, StayInfo>;
 }
 
 const ROOM_COLORS: Record<RoomStatus, string> = {
@@ -52,6 +61,15 @@ const CLEAN_ICON: Record<string, React.ReactNode> = {
   in_progress: <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin" />,
   done: <CheckCircle2 className="h-3.5 w-3.5 text-hotel-green" />,
   skipped: <AlertCircle className="h-3.5 w-3.5 text-muted-foreground" />,
+};
+
+const TV_STATE_LABELS: Record<string, { label: string; color: string }> = {
+  welcome: { label: "Приветствие", color: "text-amber-400" },
+  intro_video: { label: "Видео", color: "text-blue-400" },
+  guest_panel: { label: "Панель гостя", color: "text-hotel-green" },
+  checkout_message: { label: "Выселение", color: "text-orange-400" },
+  session_closing: { label: "Завершение", color: "text-muted-foreground" },
+  idle: { label: "Ожидание", color: "text-muted-foreground" },
 };
 
 const STATUS_OPTIONS: { value: RoomStatus; label: string }[] = [
@@ -68,18 +86,23 @@ const emptyForm = {
   photo_url: "",
 };
 
+const emptyGuest = { firstName: "", lastName: "", phone: "" };
+
 // ---------------------------------------------------------------------------
 // RoomCard
 // ---------------------------------------------------------------------------
 function RoomCard({
-  room, guest, cleanStatus,
-  onEdit, onDelete,
+  room, guest, cleanStatus, stay,
+  onEdit, onDelete, onCheckIn, onCheckOut,
 }: {
   room: Room;
   guest?: { name: string; checkOut: string };
   cleanStatus?: string;
+  stay?: StayInfo;
   onEdit: (room: Room) => void;
   onDelete: (room: Room) => void;
+  onCheckIn: (room: Room) => void;
+  onCheckOut: (stayId: string, roomNumber: string) => void;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -99,6 +122,8 @@ function RoomCard({
     else toast.error("Ошибка", { description: result.error });
     setLoading(false);
   };
+
+  const tvStateInfo = stay ? TV_STATE_LABELS[stay.tvState] : null;
 
   return (
     <div className={cn("rounded-2xl border-2 flex flex-col gap-3 transition-colors overflow-hidden", ROOM_COLORS[room.status])}>
@@ -128,7 +153,6 @@ function RoomCard({
             {room.status === "available" && <Badge variant="success" className="text-[10px]">Свободен</Badge>}
             {room.status === "occupied" && <Badge variant="gold" className="text-[10px]">Занят</Badge>}
             {room.status === "maintenance" && <Badge variant="destructive" className="text-[10px]">Сервис</Badge>}
-            {/* Edit / Delete */}
             <button
               onClick={() => onEdit(room)}
               className="ml-1 p-1 rounded-lg text-muted-foreground hover:text-blue-600 hover:bg-blue-50 transition-colors"
@@ -146,14 +170,32 @@ function RoomCard({
           </div>
         </div>
 
-        {/* Amenities */}
         {room.amenities && (
           <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
             {room.amenities}
           </p>
         )}
 
-        {guest && (
+        {/* Stay info */}
+        {stay && (
+          <div className="text-xs bg-background/60 rounded-xl px-3 py-2 space-y-1">
+            {stay.primaryGuest && (
+              <div className="font-medium text-foreground/80">{stay.primaryGuest}</div>
+            )}
+            <div className="text-muted-foreground">
+              Выезд: {new Date(stay.checkOut).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+            </div>
+            {tvStateInfo && (
+              <div className={cn("flex items-center gap-1.5 text-[10px] font-medium", tvStateInfo.color)}>
+                <Tv2 className="h-3 w-3" />
+                ТВ: {tvStateInfo.label}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Legacy guest info (when no stay but guest exists) */}
+        {!stay && guest && (
           <div className="text-xs font-medium text-foreground/80 bg-background/60 rounded-xl px-3 py-2">
             <div>{guest.name}</div>
             <div className="text-muted-foreground mt-0.5">
@@ -162,7 +204,8 @@ function RoomCard({
           </div>
         )}
 
-        <div className="flex gap-2 mt-auto">
+        {/* Status + action buttons */}
+        <div className="flex gap-2 mt-auto flex-wrap">
           <Select
             value={room.status}
             onValueChange={(v) => handleStatusChange(v as RoomStatus)}
@@ -192,15 +235,229 @@ function RoomCard({
             </Button>
           )}
         </div>
+
+        {/* TV action buttons */}
+        <div className="flex gap-2 flex-wrap">
+          {!stay && room.status === "occupied" && (
+            <Button
+              size="sm"
+              variant="cream"
+              className="h-7 text-xs gap-1 flex-1"
+              onClick={() => onCheckIn(room)}
+            >
+              <LogIn className="h-3 w-3" />
+              Заселить
+            </Button>
+          )}
+          {!stay && room.status === "available" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs gap-1 flex-1"
+              onClick={() => onCheckIn(room)}
+            >
+              <LogIn className="h-3 w-3" />
+              Заселить
+            </Button>
+          )}
+          {stay && stay.tvState !== "checkout_message" && stay.tvState !== "session_closing" && (
+            <>
+              <a
+                href={`/tv/room/${room.number}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 h-7 px-2.5 text-xs rounded-xl border border-border bg-background hover:bg-secondary transition-colors"
+              >
+                <Tv2 className="h-3 w-3" />
+                TV
+              </a>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-7 text-xs gap-1 flex-1"
+                onClick={() => onCheckOut(stay.stayId, room.number)}
+              >
+                <LogOut className="h-3 w-3" />
+                Выселить
+              </Button>
+            </>
+          )}
+          {stay && (stay.tvState === "checkout_message" || stay.tvState === "session_closing") && (
+            <div className="text-xs text-muted-foreground bg-secondary rounded-xl px-3 py-1.5 w-full text-center">
+              Выселение в процессе…
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// RoomsClient (main export)
+// CheckIn Dialog
 // ---------------------------------------------------------------------------
-export function RoomsClient({ rooms: initialRooms, guestMap, cleaningMap }: Props) {
+function CheckInDialog({
+  room,
+  open,
+  onClose,
+  onSuccess,
+}: {
+  room: Room | null;
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [guests, setGuests] = useState([{ ...emptyGuest }]);
+  const [checkOut, setCheckOut] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const addGuest = () => {
+    if (guests.length < 4) setGuests((g) => [...g, { ...emptyGuest }]);
+  };
+  const removeGuest = (i: number) => setGuests((g) => g.filter((_, idx) => idx !== i));
+  const updateGuest = (i: number, field: keyof typeof emptyGuest, val: string) => {
+    setGuests((g) => g.map((gst, idx) => idx === i ? { ...gst, [field]: val } : gst));
+  };
+
+  const handleSave = async () => {
+    if (!room) return;
+    if (!checkOut) { setError("Укажите дату выезда"); return; }
+    if (!guests[0].firstName || !guests[0].lastName) {
+      setError("Укажите имя и фамилию основного гостя");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+
+    const result = await checkInRoom({
+      roomId: room.id,
+      checkOutDate: checkOut,
+      guests: guests
+        .filter((g) => g.firstName || g.lastName)
+        .map((g, i) => ({
+          firstName: g.firstName,
+          lastName: g.lastName,
+          phone: g.phone || undefined,
+          isPrimary: i === 0,
+        })),
+    });
+
+    if (result.success) {
+      toast.success("Гость заселён");
+      onSuccess();
+      onClose();
+    } else {
+      setError(result.error ?? "Ошибка заселения");
+    }
+    setSaving(false);
+  };
+
+  const handleClose = () => {
+    setGuests([{ ...emptyGuest }]);
+    setCheckOut("");
+    setError(null);
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <LogIn className="h-4 w-4" />
+            Заселение · Номер {room?.number}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Check-out date */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Дата выезда <span className="text-red-500">*</span></label>
+            <Input
+              type="date"
+              min={today}
+              value={checkOut}
+              onChange={(e) => setCheckOut(e.target.value)}
+            />
+          </div>
+
+          {/* Guests */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Гости</label>
+              {guests.length < 4 && (
+                <button
+                  type="button"
+                  onClick={addGuest}
+                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                >
+                  <Plus className="h-3 w-3" /> Добавить гостя
+                </button>
+              )}
+            </div>
+            {guests.map((g, i) => (
+              <div key={i} className="bg-secondary/50 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Users className="h-3 w-3" />
+                    {i === 0 ? "Основной гость" : `Гость ${i + 1}`}
+                  </div>
+                  {i > 0 && (
+                    <button onClick={() => removeGuest(i)} className="text-muted-foreground hover:text-destructive">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    placeholder="Имя *"
+                    value={g.firstName}
+                    onChange={(e) => updateGuest(i, "firstName", e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                  <Input
+                    placeholder="Фамилия *"
+                    value={g.lastName}
+                    onChange={(e) => updateGuest(i, "lastName", e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <Input
+                  placeholder="Телефон (необязательно)"
+                  value={g.phone}
+                  onChange={(e) => updateGuest(i, "phone", e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+            ))}
+          </div>
+
+          {error && (
+            <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-xl px-3 py-2">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={handleClose} disabled={saving}>Отмена</Button>
+          <Button onClick={handleSave} disabled={saving} className="gold-gradient text-white border-0">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><LogIn className="h-4 w-4" /> Заселить</>}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RoomsClient
+// ---------------------------------------------------------------------------
+export function RoomsClient({ rooms: initialRooms, guestMap, cleaningMap, stayMap }: Props) {
+  const router = useRouter();
   const [rooms, setRooms] = useState<Room[]>(initialRooms);
 
   // ---- Add / Edit dialog ----
@@ -215,6 +472,9 @@ export function RoomsClient({ rooms: initialRooms, guestMap, cleaningMap }: Prop
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingRoom, setDeletingRoom] = useState<Room | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // ---- Check-in dialog ----
+  const [checkInRoom_, setCheckInRoom] = useState<Room | null>(null);
 
   // ---- Stats ----
   const stats = {
@@ -302,9 +562,17 @@ export function RoomsClient({ rooms: initialRooms, guestMap, cleaningMap }: Prop
         const result = await updateRoom(editingRoom.id, payload);
         if (!result.success) { setFormError(result.error ?? "Ошибка"); return; }
         setRooms((prev) =>
-          prev.map((r) => r.id === editingRoom.id
-            ? { ...r, description: payload.description ?? null, amenities: payload.amenities ?? null, photo_url: payload.photo_url ?? null, floor: payload.floor }
-            : r
+          prev.map((r) =>
+            r.id === editingRoom.id
+              ? {
+                  ...r,
+                  number: payload.number,
+                  floor: payload.floor,
+                  description: payload.description ?? null,
+                  amenities: payload.amenities ?? null,
+                  photo_url: payload.photo_url ?? null,
+                }
+              : r
           )
         );
         toast.success("Номер обновлён");
@@ -349,6 +617,17 @@ export function RoomsClient({ rooms: initialRooms, guestMap, cleaningMap }: Prop
     }
   };
 
+  // ---- Check-out ----
+  const handleCheckOut = async (stayId: string, roomNumber: string) => {
+    const result = await checkOutRoom(stayId);
+    if (result.success) {
+      toast.success(`Выселение номера ${roomNumber} начато`);
+      router.refresh();
+    } else {
+      toast.error("Ошибка", { description: result.error });
+    }
+  };
+
   return (
     <main className="flex-1 overflow-y-auto p-6">
       {/* Header */}
@@ -378,30 +657,45 @@ export function RoomsClient({ rooms: initialRooms, guestMap, cleaningMap }: Prop
       </div>
 
       {/* Room grid by floor */}
-      {Object.entries(byFloor).sort(([a], [b]) => a.localeCompare(b)).map(([floor, floorRooms]) => (
-        <div key={floor} className="mb-8">
-          <h2 className="font-serif text-base font-medium text-muted-foreground mb-3 flex items-center gap-2">
-            <Wrench className="h-3.5 w-3.5 opacity-50" />
-            {floor}
-          </h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-            {floorRooms.map((room) => (
-              <RoomCard
-                key={room.id}
-                room={room}
-                guest={guestMap[room.id]}
-                cleanStatus={cleaningMap[room.id]}
-                onEdit={openEditDialog}
-                onDelete={openDeleteDialog}
-              />
-            ))}
+      {Object.entries(byFloor)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([floor, floorRooms]) => (
+          <div key={floor} className="mb-8">
+            <h2 className="font-serif text-base font-medium text-muted-foreground mb-3 flex items-center gap-2">
+              <Wrench className="h-3.5 w-3.5 opacity-50" />
+              {floor}
+            </h2>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+              {floorRooms.map((room) => (
+                <RoomCard
+                  key={room.id}
+                  room={room}
+                  guest={guestMap[room.id]}
+                  cleanStatus={cleaningMap[room.id]}
+                  stay={stayMap[room.id]}
+                  onEdit={openEditDialog}
+                  onDelete={openDeleteDialog}
+                  onCheckIn={setCheckInRoom}
+                  onCheckOut={handleCheckOut}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Add / Edit Dialog                                                    */}
-      {/* ------------------------------------------------------------------ */}
+      {/* ---------------------------------------------------------------------- */}
+      {/* Check-in dialog                                                          */}
+      {/* ---------------------------------------------------------------------- */}
+      <CheckInDialog
+        room={checkInRoom_}
+        open={!!checkInRoom_}
+        onClose={() => setCheckInRoom(null)}
+        onSuccess={() => router.refresh()}
+      />
+
+      {/* ---------------------------------------------------------------------- */}
+      {/* Add / Edit Dialog                                                        */}
+      {/* ---------------------------------------------------------------------- */}
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -411,7 +705,6 @@ export function RoomsClient({ rooms: initialRooms, guestMap, cleaningMap }: Prop
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {/* Number */}
             <div className="space-y-1">
               <label className="text-sm font-medium">
                 Номер комнаты <span className="text-red-500">*</span>
@@ -423,8 +716,6 @@ export function RoomsClient({ rooms: initialRooms, guestMap, cleaningMap }: Prop
                 onChange={(e) => setForm((p) => ({ ...p, number: e.target.value }))}
               />
             </div>
-
-            {/* Floor */}
             <div className="space-y-1">
               <label className="text-sm font-medium">Этаж</label>
               <Input
@@ -434,8 +725,6 @@ export function RoomsClient({ rooms: initialRooms, guestMap, cleaningMap }: Prop
                 onChange={(e) => setForm((p) => ({ ...p, floor: e.target.value }))}
               />
             </div>
-
-            {/* Description */}
             <div className="space-y-1">
               <label className="text-sm font-medium">Описание</label>
               <Textarea
@@ -445,8 +734,6 @@ export function RoomsClient({ rooms: initialRooms, guestMap, cleaningMap }: Prop
                 onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
               />
             </div>
-
-            {/* Amenities */}
             <div className="space-y-1">
               <label className="text-sm font-medium">Удобства</label>
               <Textarea
@@ -456,8 +743,6 @@ export function RoomsClient({ rooms: initialRooms, guestMap, cleaningMap }: Prop
                 onChange={(e) => setForm((p) => ({ ...p, amenities: e.target.value }))}
               />
             </div>
-
-            {/* Photo */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Фото</label>
               <div className="flex items-center gap-2">
@@ -503,7 +788,6 @@ export function RoomsClient({ rooms: initialRooms, guestMap, cleaningMap }: Prop
                 </div>
               )}
             </div>
-
             {formError && (
               <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-xl px-3 py-2">
                 {formError}
@@ -512,9 +796,7 @@ export function RoomsClient({ rooms: initialRooms, guestMap, cleaningMap }: Prop
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={closeDialog} disabled={saving}>
-              Отмена
-            </Button>
+            <Button variant="outline" onClick={closeDialog} disabled={saving}>Отмена</Button>
             <Button onClick={handleSave} disabled={saving || uploading}>
               {saving ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Сохранение...</>
@@ -524,9 +806,9 @@ export function RoomsClient({ rooms: initialRooms, guestMap, cleaningMap }: Prop
         </DialogContent>
       </Dialog>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Delete confirmation dialog                                           */}
-      {/* ------------------------------------------------------------------ */}
+      {/* ---------------------------------------------------------------------- */}
+      {/* Delete confirmation dialog                                               */}
+      {/* ---------------------------------------------------------------------- */}
       <Dialog open={deleteDialogOpen} onOpenChange={(open) => !open && closeDeleteDialog()}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -538,9 +820,7 @@ export function RoomsClient({ rooms: initialRooms, guestMap, cleaningMap }: Prop
             Это действие невозможно отменить.
           </p>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={closeDeleteDialog} disabled={deleting}>
-              Отмена
-            </Button>
+            <Button variant="outline" onClick={closeDeleteDialog} disabled={deleting}>Отмена</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Удаление...</>

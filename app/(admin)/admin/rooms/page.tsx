@@ -7,17 +7,22 @@ async function getRoomsData() {
   const supabase = createAdminClient();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [{ data: rooms }, { data: guests }, { data: cleaning }] = await Promise.all([
-    supabase.from("rooms").select("*").order("number"),
-    supabase
-      .from("guests")
-      .select("id, first_name, last_name, check_out, room_id")
-      .eq("status", "active"),
-    supabase
-      .from("cleaning_records")
-      .select("room_id, status")
-      .eq("scheduled_date", today),
-  ]);
+  const [{ data: rooms }, { data: guests }, { data: cleaning }, { data: stays }] =
+    await Promise.all([
+      supabase.from("rooms").select("*").order("number"),
+      supabase
+        .from("guests")
+        .select("id, first_name, last_name, check_out, room_id")
+        .eq("status", "active"),
+      supabase
+        .from("cleaning_records")
+        .select("room_id, status")
+        .eq("scheduled_date", today),
+      supabase
+        .from("stays")
+        .select("id, room_id, tv_state, check_out_scheduled, stay_guests(first_name, last_name, is_primary)")
+        .eq("status", "active"),
+    ]);
 
   return {
     rooms: (rooms ?? []) as {
@@ -34,6 +39,28 @@ async function getRoomsData() {
     cleaningMap: Object.fromEntries(
       (cleaning ?? []).map((c) => [c.room_id, c.status])
     ) as Record<string, string>,
+    stayMap: Object.fromEntries(
+      (stays ?? []).map((s) => {
+        const primary =
+          (s.stay_guests as { first_name: string; last_name: string; is_primary: boolean }[])?.find(
+            (g) => g.is_primary
+          ) ?? (s.stay_guests as { first_name: string; last_name: string; is_primary: boolean }[])?.[0];
+        return [
+          s.room_id,
+          {
+            stayId: s.id,
+            tvState: s.tv_state as string,
+            checkOut: s.check_out_scheduled,
+            primaryGuest: primary
+              ? `${primary.first_name} ${primary.last_name}`
+              : null,
+          },
+        ];
+      })
+    ) as Record<
+      string,
+      { stayId: string; tvState: string; checkOut: string; primaryGuest: string | null }
+    >,
   };
 }
 

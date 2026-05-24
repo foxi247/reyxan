@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["web-push", "bcryptjs"],
   async headers() {
     return [
       {
