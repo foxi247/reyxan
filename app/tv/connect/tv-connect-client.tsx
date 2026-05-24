@@ -1,6 +1,8 @@
 "use client";
 
-import { Tv2, BedDouble, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { createBrowserClient } from "@supabase/ssr";
+import { Tv2, BedDouble, Sparkles, Loader2 } from "lucide-react";
 
 type RoomStatus = "available" | "occupied" | "maintenance";
 
@@ -18,14 +20,29 @@ interface Room {
   theme_name: string | null;
 }
 
-export function TvConnectClient({ rooms }: { rooms: Room[] }) {
-  const saveAndGo = (e: React.MouseEvent<HTMLAnchorElement>, roomNumber: string) => {
-    e.preventDefault(); // prevent default href navigation
+export function ClientPage() {
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    supabase
+      .from("rooms")
+      .select("id, number, floor, status, theme_name")
+      .order("number")
+      .then(({ data }) => {
+        setRooms((data ?? []) as Room[]);
+        setLoading(false);
+      });
+  }, []);
+
+  const handleConnect = (roomNumber: string) => {
     try {
       localStorage.setItem("reyxan_tv_room_number", roomNumber);
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
     window.location.href = "/tv/room";
   };
 
@@ -45,7 +62,12 @@ export function TvConnectClient({ rooms }: { rooms: Room[] }) {
 
       {/* Room grid */}
       <div className="flex-1 max-w-5xl mx-auto w-full px-8 pb-16">
-        {rooms.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-64 gap-4 text-white/40">
+            <Loader2 className="h-12 w-12 animate-spin" />
+            <p className="text-xl">Загрузка номеров…</p>
+          </div>
+        ) : rooms.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-white/30 gap-4">
             <BedDouble className="h-16 w-16" />
             <p className="text-2xl">Номера не найдены</p>
@@ -56,50 +78,42 @@ export function TvConnectClient({ rooms }: { rooms: Room[] }) {
             {rooms.map((room) => {
               const st = STATUS_CONFIG[room.status];
               return (
-                <a
+                <button
                   key={room.id}
-                  href="/tv/room"
-                  onClick={(e) => saveAndGo(e, room.number)}
+                  onClick={() => handleConnect(room.number)}
                   className="
                     group flex flex-col gap-4 p-6 rounded-3xl
                     bg-white/5 border-2 border-white/10
                     hover:bg-amber-400/10 hover:border-amber-400/50
                     focus:bg-amber-400/10 focus:border-amber-400/70
-                    active:scale-95
+                    active:scale-95 active:bg-amber-400/20
                     transition-all duration-150 text-left
                     outline-none focus:ring-4 focus:ring-amber-400/30
-                    cursor-pointer no-underline
+                    cursor-pointer
                   "
-                  tabIndex={0}
                 >
-                  {/* Room number — large for TV */}
                   <div className="font-serif text-7xl font-light leading-none text-white/90 group-hover:text-amber-300 group-focus:text-amber-300 transition-colors">
                     {room.number}
                   </div>
 
-                  {/* Theme name */}
                   {room.theme_name ? (
                     <div className="flex items-center gap-1.5 text-base text-amber-400/80">
                       <Sparkles className="h-4 w-4 flex-shrink-0" />
                       <span className="leading-snug">{room.theme_name}</span>
                     </div>
-                  ) : (
-                    room.floor && (
-                      <div className="text-base text-white/30">{room.floor} этаж</div>
-                    )
-                  )}
+                  ) : room.floor ? (
+                    <div className="text-base text-white/30">{room.floor} этаж</div>
+                  ) : null}
 
-                  {/* Status */}
                   <div className="flex items-center gap-2">
                     <div className={`h-3 w-3 rounded-full flex-shrink-0 ${st.dot}`} />
                     <span className="text-base text-white/50">{st.label}</span>
                   </div>
 
-                  {/* Connect label */}
                   <div className="mt-auto pt-2 text-base font-medium text-amber-400 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
                     Подключить →
                   </div>
-                </a>
+                </button>
               );
             })}
           </div>
