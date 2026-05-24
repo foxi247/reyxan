@@ -20,13 +20,13 @@ interface Room {
 
 export function TvConnectClient({ rooms }: { rooms: Room[] }) {
   const saveAndGo = (e: React.MouseEvent<HTMLAnchorElement>, roomNumber: string) => {
+    e.preventDefault(); // prevent default href navigation
     try {
       localStorage.setItem("reyxan_tv_room_number", roomNumber);
     } catch {
-      // localStorage unavailable — navigation still works via href
+      // ignore
     }
-    // Let the href handle actual navigation
-    void e;
+    window.location.href = "/tv/room";
   };
 
   return (
@@ -58,7 +58,7 @@ export function TvConnectClient({ rooms }: { rooms: Room[] }) {
               return (
                 <a
                   key={room.id}
-                  href={`/tv/room/${room.number}`}
+                  href="/tv/room"
                   onClick={(e) => saveAndGo(e, room.number)}
                   className="
                     group flex flex-col gap-4 p-6 rounded-3xl

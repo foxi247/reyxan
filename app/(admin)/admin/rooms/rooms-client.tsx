@@ -266,6 +266,7 @@ function RoomCard({
                 href={`/tv/room/${room.number}`}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => { try { localStorage.setItem("reyxan_tv_room_number", room.number); } catch { /**/ } }}
                 className="inline-flex items-center gap-1 h-7 px-2.5 text-xs rounded-xl border border-border bg-background hover:bg-secondary transition-colors"
               >
                 <Tv2 className="h-3 w-3" />
