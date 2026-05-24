@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BedDouble, Sparkles, Wrench, CheckCircle2, Clock, Loader2, AlertCircle,
-  Plus, Pencil, Trash2, X, Upload, Tv2, LogIn, LogOut, Users, QrCode,
+  Plus, Pencil, Trash2, X, Upload, Tv2, LogIn, LogOut, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -297,17 +297,32 @@ function CheckInDialog({
   onSuccess: () => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [guestCount, setGuestCount] = useState(1);
+  const [guestNames, setGuestNames] = useState([{ firstName: "", lastName: "" }]);
   const [checkIn, setCheckIn] = useState(today);
   const [checkOut, setCheckOut] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [qrToken, setQrToken] = useState<string | null>(null);
+  const [savedCheckOut, setSavedCheckOut] = useState("");
+
+  const handleCountChange = (count: number) => {
+    setGuestCount(count);
+    setGuestNames(prev => {
+      const next = [...prev];
+      while (next.length < count) next.push({ firstName: "", lastName: "" });
+      return next.slice(0, count);
+    });
+  };
+
+  const updateName = (i: number, field: "firstName" | "lastName", val: string) =>
+    setGuestNames(prev => prev.map((g, idx) => idx === i ? { ...g, [field]: val } : g));
 
   const handleSave = async () => {
     if (!room) return;
-    if (!firstName.trim() || !lastName.trim()) { setError("Укажите имя и фамилию гостя"); return; }
+    if (!guestNames[0].firstName.trim() || !guestNames[0].lastName.trim()) {
+      setError("Укажите имя и фамилию основного гостя"); return;
+    }
     if (!checkOut) { setError("Укажите дату выезда"); return; }
     if (checkOut <= checkIn) { setError("Дата выезда должна быть позже даты въезда"); return; }
     setSaving(true);
@@ -317,12 +332,15 @@ function CheckInDialog({
       roomId: room.id,
       checkInDate: checkIn,
       checkOutDate: checkOut,
-      guests: [{ firstName: firstName.trim(), lastName: lastName.trim(), isPrimary: true }],
+      guests: guestNames
+        .filter(g => g.firstName.trim())
+        .map((g, i) => ({ firstName: g.firstName.trim(), lastName: g.lastName.trim(), isPrimary: i === 0 })),
     });
 
     if (result.success && result.data) {
       toast.success("Гость заселён");
       onSuccess();
+      setSavedCheckOut(checkOut);
       setQrToken(result.data.accessToken);
     } else {
       setError(result.error ?? "Ошибка заселения");
@@ -331,49 +349,58 @@ function CheckInDialog({
   };
 
   const handleClose = () => {
-    setFirstName("");
-    setLastName("");
+    setGuestCount(1);
+    setGuestNames([{ firstName: "", lastName: "" }]);
     setCheckIn(today);
     setCheckOut("");
     setError(null);
     setQrToken(null);
+    setSavedCheckOut("");
     onClose();
   };
 
-  const qrUrl = qrToken
-    ? `${typeof window !== "undefined" ? window.location.origin : ""}/guest/access?token=${qrToken}`
+  const qrUrl = qrToken && typeof window !== "undefined"
+    ? `${window.location.origin}/guest/access?token=${qrToken}`
     : null;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         {qrToken ? (
-          /* ---- QR success screen ---- */
+          /* ── QR success screen ── */
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-hotel-green">
                 <CheckCircle2 className="h-4 w-4" />
-                Гость заселён · Номер {room?.number}
+                Заселено · Номер {room?.number}
               </DialogTitle>
             </DialogHeader>
-            <div className="flex flex-col items-center gap-4 py-4">
+            <div className="flex flex-col items-center gap-4 py-3">
               <p className="text-sm text-muted-foreground text-center">
                 Покажите QR-код гостю — он откроет доступ к сервисам отеля
               </p>
-              <div className="bg-white rounded-2xl p-3 shadow-md">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrUrl ?? "")}&bgcolor=ffffff&color=0a0a0a&margin=0`}
-                  alt="QR"
-                  width={220}
-                  height={220}
-                  className="rounded-xl"
-                />
-              </div>
+              {qrUrl ? (
+                <div className="bg-white rounded-2xl p-3 shadow-md border border-border">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrUrl)}&bgcolor=ffffff&color=0a0a0a&margin=0`}
+                    alt="QR"
+                    width={220}
+                    height={220}
+                    className="rounded-xl"
+                  />
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground bg-secondary rounded-xl px-4 py-3 text-center">
+                  Загрузка QR…
+                </div>
+              )}
               <div className="text-center space-y-1">
-                <p className="font-medium">{firstName} {lastName}</p>
+                <p className="font-medium">
+                  {guestNames.filter(g => g.firstName).map(g => `${g.firstName} ${g.lastName}`).join(", ")}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  Номер {room?.number} · Выезд {new Date(checkOut).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+                  Номер {room?.number} · Выезд {savedCheckOut ? new Date(savedCheckOut).toLocaleDateString("ru-RU", { day:"numeric", month:"long" }) : "—"}
                 </p>
               </div>
             </div>
@@ -384,7 +411,7 @@ function CheckInDialog({
             </DialogFooter>
           </>
         ) : (
-          /* ---- Check-in form ---- */
+          /* ── Check-in form ── */
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -393,46 +420,64 @@ function CheckInDialog({
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-2">
-              {/* Guest name */}
+            <div className="space-y-5 py-2">
+              {/* Guest count selector */}
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-1.5">
                   <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                  Гость
+                  Количество гостей
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    placeholder="Имя *"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    autoFocus
-                  />
-                  <Input
-                    placeholder="Фамилия *"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                  />
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => handleCountChange(n)}
+                      className={`h-9 w-9 rounded-xl text-sm font-semibold border-2 transition-all ${
+                        guestCount === n
+                          ? "gold-gradient text-white border-transparent shadow-sm"
+                          : "border-border text-muted-foreground hover:border-gold/50"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
                 </div>
+              </div>
+
+              {/* Guest name fields */}
+              <div className="space-y-3">
+                {guestNames.map((g, i) => (
+                  <div key={i} className="space-y-1.5">
+                    <div className="text-xs text-muted-foreground font-medium">
+                      {i === 0 ? "Основной гость *" : `Гость ${i + 1}`}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="Имя"
+                        value={g.firstName}
+                        onChange={e => updateName(i, "firstName", e.target.value)}
+                        autoFocus={i === 0}
+                      />
+                      <Input
+                        placeholder="Фамилия"
+                        value={g.lastName}
+                        onChange={e => updateName(i, "lastName", e.target.value)}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {/* Dates */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-sm font-medium">Въезд</label>
-                  <Input
-                    type="date"
-                    value={checkIn}
-                    onChange={(e) => setCheckIn(e.target.value)}
-                  />
+                  <label className="text-sm font-medium">Дата въезда</label>
+                  <Input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium">Выезд <span className="text-red-500">*</span></label>
-                  <Input
-                    type="date"
-                    min={checkIn}
-                    value={checkOut}
-                    onChange={(e) => setCheckOut(e.target.value)}
-                  />
+                  <label className="text-sm font-medium">Дата выезда <span className="text-red-500">*</span></label>
+                  <Input type="date" min={checkIn} value={checkOut} onChange={e => setCheckOut(e.target.value)} />
                 </div>
               </div>
 
@@ -446,7 +491,7 @@ function CheckInDialog({
             <DialogFooter className="gap-2">
               <Button variant="outline" onClick={handleClose} disabled={saving}>Отмена</Button>
               <Button onClick={handleSave} disabled={saving} className="gold-gradient text-white border-0">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><LogIn className="h-4 w-4 mr-1" /> Заселить</>}
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><LogIn className="h-4 w-4 mr-1" />Заселить</>}
               </Button>
             </DialogFooter>
           </>
