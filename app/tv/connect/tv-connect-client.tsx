@@ -1,147 +1,97 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createBrowserClient } from "@supabase/ssr";
-import { Tv2, BedDouble, Loader2 } from "lucide-react";
-
-type RoomStatus = "available" | "occupied" | "maintenance";
-
-const STATUS_CONFIG: Record<RoomStatus, { label: string; dot: string }> = {
-  available:   { label: "Свободен",     dot: "bg-emerald-400" },
-  occupied:    { label: "Занят",        dot: "bg-amber-400"   },
-  maintenance: { label: "Обслуживание", dot: "bg-red-400"     },
-};
-
-interface Room {
-  id: string;
-  number: string;
-  floor: number | null;
-  status: RoomStatus;
-}
+import { useState } from "react";
+import { Tv2 } from "lucide-react";
 
 export function ClientPage() {
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [roomNumber, setRoomNumber] = useState("");
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) {
-      setFetchError("Supabase не настроен (нет env переменных)");
-      setLoading(false);
-      return;
-    }
-    const supabase = createBrowserClient(url, key);
-    const timer = setTimeout(() => {
-      setFetchError("Превышено время ожидания. Проверьте соединение.");
-      setLoading(false);
-    }, 10000);
-
-    Promise.resolve(
-      supabase.from("rooms").select("id, number, floor, status").order("number")
-    ).then(({ data, error }) => {
-      clearTimeout(timer);
-      if (error) {
-        setFetchError(`Ошибка: ${error.message}`);
-      } else {
-        setRooms((data ?? []) as Room[]);
-      }
-      setLoading(false);
-    }).catch((e: unknown) => {
-      clearTimeout(timer);
-      setFetchError(e instanceof Error ? e.message : "Ошибка соединения");
-      setLoading(false);
-    });
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  const handleConnect = (roomNumber: string) => {
-    try {
-      localStorage.setItem("reyxan_tv_room_number", roomNumber);
-    } catch { /* ignore */ }
+  const handleConnect = () => {
+    const n = roomNumber.trim();
+    if (!n) { setError("Введите номер комнаты"); return; }
+    try { localStorage.setItem("reyxan_tv_room_number", n); } catch { /* ignore */ }
     window.location.href = "/tv/room";
   };
 
+  const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") handleConnect();
+  };
+
+  const appendDigit = (d: string) => {
+    setError("");
+    setRoomNumber((prev) => (prev.length < 4 ? prev + d : prev));
+  };
+
+  const deleteLast = () => {
+    setError("");
+    setRoomNumber((prev) => prev.slice(0, -1));
+  };
+
+  const DIGITS = ["1","2","3","4","5","6","7","8","9","0"];
+
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col">
+    <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center px-8 gap-10">
+
       {/* Header */}
-      <div className="flex flex-col items-center justify-center pt-16 pb-10 px-8 text-center">
-        <div className="flex items-center gap-3 mb-6">
+      <div className="text-center">
+        <div className="flex items-center justify-center gap-3 mb-4">
           <Tv2 className="h-10 w-10 text-amber-400" />
-          <span className="font-serif text-4xl font-light tracking-wide">Reyhan Hotel</span>
+          <span className="font-serif text-4xl font-light">Reyhan Hotel</span>
         </div>
-        <h1 className="text-5xl font-serif font-light mb-4">Подключение телевизора</h1>
-        <p className="text-xl text-white/50 max-w-lg leading-relaxed">
-          Выберите номер, к которому подключён этот телевизор
-        </p>
+        <h1 className="text-5xl font-serif font-light mb-3">Подключение телевизора</h1>
+        <p className="text-xl text-white/50">Введите номер вашей комнаты</p>
       </div>
 
-      {/* Room grid */}
-      <div className="flex-1 max-w-5xl mx-auto w-full px-8 pb-16">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center h-64 gap-4 text-white/40">
-            <Loader2 className="h-12 w-12 animate-spin" />
-            <p className="text-xl">Загрузка номеров…</p>
-          </div>
-        ) : fetchError ? (
-          <div className="flex flex-col items-center justify-center h-64 gap-4 text-red-400 text-center">
-            <p className="text-2xl">⚠️ Не удалось загрузить</p>
-            <p className="text-base text-white/40 max-w-md">{fetchError}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 px-8 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-lg transition-colors"
-            >
-              Попробовать снова
-            </button>
-          </div>
-        ) : rooms.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-white/30 gap-4">
-            <BedDouble className="h-16 w-16" />
-            <p className="text-2xl">Номера не найдены</p>
-            <p className="text-lg">Добавьте номера в админ-панели</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
-            {rooms.map((room) => {
-              const st = STATUS_CONFIG[room.status];
-              return (
-                <button
-                  key={room.id}
-                  onClick={() => handleConnect(room.number)}
-                  className="
-                    group flex flex-col gap-4 p-6 rounded-3xl
-                    bg-white/5 border-2 border-white/10
-                    hover:bg-amber-400/10 hover:border-amber-400/50
-                    focus:bg-amber-400/10 focus:border-amber-400/70
-                    active:scale-95 active:bg-amber-400/20
-                    transition-all duration-150 text-left
-                    outline-none focus:ring-4 focus:ring-amber-400/30
-                    cursor-pointer
-                  "
-                >
-                  <div className="font-serif text-7xl font-light leading-none text-white/90 group-hover:text-amber-300 group-focus:text-amber-300 transition-colors">
-                    {room.number}
-                  </div>
-
-                  {room.floor ? (
-                    <div className="text-base text-white/30">{room.floor} этаж</div>
-                  ) : null}
-
-                  <div className="flex items-center gap-2">
-                    <div className={`h-3 w-3 rounded-full flex-shrink-0 ${st.dot}`} />
-                    <span className="text-base text-white/50">{st.label}</span>
-                  </div>
-
-                  <div className="mt-auto pt-2 text-base font-medium text-amber-400 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
-                    Подключить →
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+      {/* Display */}
+      <div className="w-full max-w-sm">
+        <div className="bg-white/5 border-2 border-white/20 rounded-3xl px-8 py-6 text-center mb-4">
+          <span className="font-serif text-8xl font-light tracking-widest text-white">
+            {roomNumber || <span className="text-white/20">—</span>}
+          </span>
+        </div>
+        {error && (
+          <p className="text-center text-red-400 text-lg mb-2">{error}</p>
         )}
+
+        {/* Hidden text input (for TV keyboard) */}
+        <input
+          type="number"
+          inputMode="numeric"
+          value={roomNumber}
+          onChange={(e) => { setError(""); setRoomNumber(e.target.value.slice(0, 4)); }}
+          onKeyDown={handleKey}
+          placeholder="Номер комнаты"
+          className="w-full bg-white/5 border border-white/20 rounded-2xl px-5 py-4 text-2xl text-center text-white placeholder:text-white/30 outline-none focus:border-amber-400/60 mb-6"
+          autoFocus
+        />
+
+        {/* On-screen numpad (for TV remote) */}
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          {DIGITS.map((d) => (
+            <button
+              key={d}
+              onClick={() => appendDigit(d)}
+              className="bg-white/8 hover:bg-white/15 active:bg-amber-400/30 border border-white/10 rounded-2xl py-5 text-3xl font-light transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400/50"
+            >
+              {d}
+            </button>
+          ))}
+          <button
+            onClick={deleteLast}
+            className="bg-white/5 hover:bg-white/10 active:bg-red-400/20 border border-white/10 rounded-2xl py-5 text-2xl transition-colors focus:outline-none focus:ring-2 focus:ring-white/30 col-span-2"
+          >
+            ← Стереть
+          </button>
+        </div>
+
+        {/* Connect button */}
+        <button
+          onClick={handleConnect}
+          className="w-full bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-semibold text-2xl rounded-2xl py-5 transition-colors focus:outline-none focus:ring-4 focus:ring-amber-400/50"
+        >
+          Подключить →
+        </button>
       </div>
     </div>
   );
