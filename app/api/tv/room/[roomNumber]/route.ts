@@ -10,43 +10,51 @@ export async function GET(
     const { roomNumber } = await params;
     const supabase = createAdminClient();
 
-    // Get room with theme fields
-    const { data: room } = await supabase
+    // Use select("*") so it works even if migration 005 columns don't exist yet
+    const { data: room, error: roomError } = await supabase
       .from("rooms")
-      .select(
-        "id, number, floor, status, theme_name, theme_type, theme_description, theme_video_url, theme_video_duration_seconds, tv_background_url"
-      )
+      .select("*")
       .eq("number", roomNumber)
       .maybeSingle();
 
-    if (!room) {
+    if (roomError || !room) {
       return NextResponse.json({ error: "Номер не найден" }, { status: 404 });
     }
 
-    // Get active stay
-    const { data: stay } = await supabase
-      .from("stays")
-      .select("id, tv_state, tv_state_updated_at, check_in, check_out_scheduled, access_token")
-      .eq("room_id", room.id)
-      .eq("status", "active")
-      .maybeSingle();
+    // Try to get active stay — gracefully skip if table doesn't exist yet
+    let stay: {
+      id: string; tv_state: string; tv_state_updated_at: string;
+      check_in: string; check_out_scheduled: string; access_token: string | null;
+    } | null = null;
+
+    try {
+      const { data } = await supabase
+        .from("stays")
+        .select("id, tv_state, tv_state_updated_at, check_in, check_out_scheduled, access_token")
+        .eq("room_id", room.id)
+        .eq("status", "active")
+        .maybeSingle();
+      stay = data;
+    } catch { /* stays table not yet created */ }
 
     let primaryGuest: { first_name: string; last_name: string } | null = null;
     let allGuests: { first_name: string; last_name: string }[] = [];
     let qrUrl: string | null = null;
 
     if (stay) {
-      const { data: stayGuests } = await supabase
-        .from("stay_guests")
-        .select("first_name, last_name, is_primary")
-        .eq("stay_id", stay.id)
-        .order("is_primary", { ascending: false });
+      try {
+        const { data: stayGuests } = await supabase
+          .from("stay_guests")
+          .select("first_name, last_name, is_primary")
+          .eq("stay_id", stay.id)
+          .order("is_primary", { ascending: false });
 
-      allGuests = (stayGuests ?? []).map((g) => ({
-        first_name: g.first_name,
-        last_name: g.last_name,
-      }));
-      primaryGuest = allGuests[0] ?? null;
+        allGuests = (stayGuests ?? []).map((g) => ({
+          first_name: g.first_name,
+          last_name: g.last_name,
+        }));
+        primaryGuest = allGuests[0] ?? null;
+      } catch { /* stay_guests table not yet created */ }
 
       if (stay.tv_state === "welcome" && stay.access_token) {
         const host = request.headers.get("host") ?? "localhost:3000";
@@ -55,24 +63,25 @@ export async function GET(
       }
     }
 
-    // Hotel name from settings
     const { data: settings } = await supabase
       .from("hotel_settings")
       .select("hotel_name")
       .limit(1)
       .maybeSingle();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = room as any;
     return NextResponse.json({
       room: {
-        id: room.id,
-        number: room.number,
-        floor: room.floor,
-        theme_name: room.theme_name,
-        theme_type: room.theme_type,
-        theme_description: room.theme_description,
-        theme_video_url: room.theme_video_url,
-        theme_video_duration_seconds: room.theme_video_duration_seconds ?? 120,
-        tv_background_url: room.tv_background_url,
+        id: r.id,
+        number: r.number,
+        floor: r.floor ?? null,
+        theme_name: r.theme_name ?? null,
+        theme_type: r.theme_type ?? null,
+        theme_description: r.theme_description ?? null,
+        theme_video_url: r.theme_video_url ?? null,
+        theme_video_duration_seconds: r.theme_video_duration_seconds ?? 120,
+        tv_background_url: r.tv_background_url ?? null,
       },
       state: stay?.tv_state ?? "idle",
       stay: stay
