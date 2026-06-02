@@ -17,8 +17,8 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Отель Рейхан",
-  description: "Комфорт и гостеприимство в самом сердце города",
+  title: "Рейхан Отель",
+  description: "Премиальный цифровой сервис и гостеприимство в фирменном стиле Reyhan Hotel.",
   icons: { icon: "/favicon.ico" },
 };
 
@@ -28,8 +28,8 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#FBF7EF" },
-    { media: "(prefers-color-scheme: dark)", color: "#0F0D0B" },
+    { media: "(prefers-color-scheme: light)", color: "#12372b" },
+    { media: "(prefers-color-scheme: dark)", color: "#0c1f19" },
   ],
 };
 
@@ -47,8 +47,8 @@ export default function RootLayout({
       <body className="antialiased">
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
-          enableSystem
+          defaultTheme="dark"
+          enableSystem={false}
           disableTransitionOnChange={false}
         >
           {children}
@@ -57,9 +57,10 @@ export default function RootLayout({
             toastOptions={{
               style: {
                 background: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
+                border: "1px solid hsl(var(--gold) / 0.14)",
                 color: "hsl(var(--foreground))",
                 borderRadius: "1rem",
+                boxShadow: "0 16px 40px -24px rgba(0,0,0,0.7)",
               },
             }}
           />

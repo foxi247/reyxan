@@ -1,18 +1,18 @@
 "use client";
 
 import {
+  Bath,
+  BookOpen,
   ConciergeBell,
   Headphones,
-  Utensils,
-  BookOpen,
-  Bath,
   Headset,
-  Wifi,
-  Shield,
   MessageCircle,
   Phone,
   Settings,
+  Shield,
   Star,
+  Utensils,
+  Wifi,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -55,23 +55,25 @@ export function GuestServiceCard({
       onClick={onClick}
       disabled={disabled || loading}
       className={cn(
-        "service-card w-full text-left",
-        "disabled:opacity-60 disabled:cursor-not-allowed",
+        "service-card w-full text-left disabled:cursor-not-allowed disabled:opacity-60",
         className
       )}
     >
-      {/* Icon circle */}
-      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gold/10 border border-gold/20 flex-shrink-0">
+      <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-gold/20 bg-gold/12">
         {loading ? (
-          <div className="h-4 w-4 rounded-full border-2 border-gold border-t-transparent animate-spin" />
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-gold border-t-transparent" />
         ) : (
-          <Icon className="h-5 w-5 text-gold stroke-[1.5]" />
+          <Icon className="h-5 w-5 text-gold stroke-[1.6]" />
         )}
       </div>
-      {/* Label */}
-      <span className="text-sm font-medium text-foreground leading-tight line-clamp-2">
-        {title}
-      </span>
+      <div className="space-y-1">
+        <span className="block text-sm font-medium leading-tight text-hotel-cream line-clamp-2">
+          {title}
+        </span>
+        <span className="block text-[11px] uppercase tracking-[0.24em] text-gold/70">
+          сервис
+        </span>
+      </div>
     </button>
   );
 }

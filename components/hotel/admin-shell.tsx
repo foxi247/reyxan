@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Menu,
-  LayoutDashboard,
-  MessageCircle,
-  ClipboardList,
-  Utensils,
   BarChart3,
+  ClipboardList,
+  LayoutDashboard,
+  Menu,
+  MessageCircle,
+  Utensils,
 } from "lucide-react";
 import { AdminSidebar } from "./admin-sidebar";
 import { ThemeToggle } from "./theme-toggle";
@@ -21,7 +21,7 @@ const MOBILE_TABS = [
   { href: ROUTES.admin.chat, label: "Чат", Icon: MessageCircle },
   { href: ROUTES.admin.requests, label: "Запросы", Icon: ClipboardList },
   { href: ROUTES.admin.orders, label: "Заказы", Icon: Utensils },
-  { href: ROUTES.admin.analytics, label: "Анализ", Icon: BarChart3 },
+  { href: ROUTES.admin.analytics, label: "Аналитика", Icon: BarChart3 },
 ];
 
 interface AdminShellProps {
@@ -40,73 +40,57 @@ export function AdminShell({ email, title, subtitle, children }: AdminShellProps
   }, [pathname]);
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-background">
-      {/* Desktop permanent sidebar */}
-      <div className="hidden md:flex flex-shrink-0">
+    <div className="flex h-[100dvh] overflow-hidden bg-transparent text-foreground">
+      <div className="hidden flex-shrink-0 md:flex">
         <AdminSidebar adminEmail={email} />
       </div>
 
-      {/* Mobile overlay sidebar */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-50 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        >
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+        <div className="fixed inset-0 z-50 md:hidden" onClick={() => setSidebarOpen(false)}>
+          <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" />
           <div
             className="absolute left-0 top-0 h-full shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
           >
-            <AdminSidebar
-              adminEmail={email}
-              onClose={() => setSidebarOpen(false)}
-            />
+            <AdminSidebar adminEmail={email} onClose={() => setSidebarOpen(false)} />
           </div>
         </div>
       )}
 
-      {/* Main column */}
-      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
-        {/* Mobile header */}
-        <header className="flex h-14 flex-shrink-0 items-center justify-between px-4 border-b border-border bg-card md:hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex h-14 flex-shrink-0 items-center justify-between border-b border-gold/10 bg-card/80 px-4 backdrop-blur-2xl md:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-accent transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-gold/10 bg-white/5 transition-colors hover:bg-white/10"
           >
             <Menu className="h-5 w-5" />
           </button>
-          <p className="font-medium text-sm truncate max-w-[180px]">{title}</p>
+          <p className="max-w-[180px] truncate text-sm font-medium text-hotel-cream">{title}</p>
           <ThemeToggle size="sm" />
         </header>
 
-        {/* Desktop topbar */}
-        <header className="hidden md:flex h-16 flex-shrink-0 items-center justify-between px-6 border-b border-border bg-card">
+        <header className="hidden h-16 flex-shrink-0 items-center justify-between border-b border-gold/10 bg-card/75 px-6 backdrop-blur-2xl md:flex">
           <div>
-            <h1 className="font-serif text-xl font-medium">{title}</h1>
-            {subtitle && (
-              <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-            )}
+            <h1 className="font-serif text-2xl font-medium text-hotel-cream">{title}</h1>
+            {subtitle ? <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p> : null}
           </div>
           <ThemeToggle size="sm" />
         </header>
 
-        {/* Content — reserve space for mobile bottom nav */}
-        <div className="flex-1 flex flex-col overflow-hidden pb-[60px] md:pb-0">
+        <div className="flex flex-1 flex-col overflow-hidden pb-[60px] md:pb-0">
           {children}
         </div>
       </div>
 
-      {/* Mobile bottom nav */}
       <nav
-        className="fixed bottom-0 inset-x-0 z-40 md:hidden border-t border-border bg-card/95 backdrop-blur-xl"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-gold/10 bg-card/92 backdrop-blur-2xl md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="flex h-[60px]">
           {MOBILE_TABS.map(({ href, label, Icon }) => {
             const isActive =
-              href === ROUTES.admin.home
-                ? pathname === href
-                : pathname.startsWith(href);
+              href === ROUTES.admin.home ? pathname === href : pathname.startsWith(href);
+
             return (
               <Link
                 key={href}

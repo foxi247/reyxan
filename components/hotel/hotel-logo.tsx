@@ -6,7 +6,11 @@ interface HotelLogoProps {
   variant?: "light" | "dark" | "gold";
 }
 
-export function HotelLogo({ className, size = "md", variant = "gold" }: HotelLogoProps) {
+export function HotelLogo({
+  className,
+  size = "md",
+  variant = "gold",
+}: HotelLogoProps) {
   const sizes = {
     sm: { ornament: 20, title: "text-lg", subtitle: "text-[9px]" },
     md: { ornament: 28, title: "text-2xl", subtitle: "text-[10px]" },
@@ -24,7 +28,6 @@ export function HotelLogo({ className, size = "md", variant = "gold" }: HotelLog
 
   return (
     <div className={cn("flex flex-col items-center gap-1", className)}>
-      {/* Ornament */}
       <svg
         width={s.ornament}
         height={s.ornament}
@@ -32,13 +35,13 @@ export function HotelLogo({ className, size = "md", variant = "gold" }: HotelLog
         fill="none"
         className={cn("opacity-90", c)}
       >
-        {/* 8-petal flower ornament */}
         {Array.from({ length: 8 }).map((_, i) => {
           const angle = (i * 45 * Math.PI) / 180;
           const x1 = 14 + 4 * Math.cos(angle);
           const y1 = 14 + 4 * Math.sin(angle);
           const x2 = 14 + 11 * Math.cos(angle);
           const y2 = 14 + 11 * Math.sin(angle);
+
           return (
             <line
               key={i}
@@ -57,16 +60,15 @@ export function HotelLogo({ className, size = "md", variant = "gold" }: HotelLog
           const angle = ((i * 45 + 22.5) * Math.PI) / 180;
           const cx = 14 + 7.5 * Math.cos(angle);
           const cy = 14 + 7.5 * Math.sin(angle);
-          return (
-            <circle key={i} cx={cx} cy={cy} r="0.8" fill="currentColor" />
-          );
+
+          return <circle key={i} cx={cx} cy={cy} r="0.8" fill="currentColor" />;
         })}
       </svg>
-      {/* Text */}
+
       <div className="flex flex-col items-center">
         <span
           className={cn(
-            "font-serif font-medium tracking-widest leading-none",
+            "font-serif font-medium tracking-[0.32em] leading-none uppercase",
             s.title,
             c
           )}
@@ -75,7 +77,7 @@ export function HotelLogo({ className, size = "md", variant = "gold" }: HotelLog
         </span>
         <span
           className={cn(
-            "tracking-[0.2em] uppercase font-sans font-light",
+            "font-sans font-light uppercase tracking-[0.35em]",
             s.subtitle,
             variant === "gold" ? "text-muted-foreground" : c
           )}

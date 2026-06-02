@@ -3,21 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  Users,
-  ClipboardList,
-  MessageCircle,
-  ConciergeBell,
-  Utensils,
-  UtensilsCrossed,
   BarChart3,
   BedDouble,
-  Sparkles,
   CalendarPlus,
-  Settings,
+  ClipboardList,
+  ConciergeBell,
+  LayoutDashboard,
   LogOut,
-  X,
+  MessageCircle,
+  Settings,
+  Sparkles,
   UserCog,
+  Users,
+  Utensils,
+  UtensilsCrossed,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HotelLogo } from "@/components/hotel/hotel-logo";
@@ -26,7 +26,7 @@ import { ROUTES } from "@/lib/constants";
 import { adminLogout } from "@/lib/actions/admin";
 
 const NAV_ITEMS = [
-  { href: ROUTES.admin.home, label: "Dashboard", Icon: LayoutDashboard },
+  { href: ROUTES.admin.home, label: "Главная", Icon: LayoutDashboard },
   { href: ROUTES.admin.guests, label: "Гости", Icon: Users },
   { href: ROUTES.admin.requests, label: "Запросы", Icon: ClipboardList },
   { href: ROUTES.admin.chat, label: "Чат", Icon: MessageCircle },
@@ -50,59 +50,58 @@ export function AdminSidebar({ adminEmail, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-full w-[260px] flex-shrink-0 flex-col border-r border-border bg-card">
-      {/* Logo */}
-      <div className="relative flex flex-col items-center gap-2 border-b border-border px-6 py-6">
-        {onClose && (
+    <aside className="flex h-full w-[280px] flex-shrink-0 flex-col border-r border-gold/10 bg-card/92 backdrop-blur-2xl">
+      <div className="relative flex flex-col items-center gap-2 border-b border-gold/10 px-6 py-6">
+        {onClose ? (
           <button
             onClick={onClose}
-            className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg hover:bg-accent transition-colors md:hidden"
+            className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg border border-gold/10 bg-white/5 transition-colors hover:bg-white/10 md:hidden"
           >
             <X className="h-4 w-4" />
           </button>
-        )}
+        ) : null}
         <HotelLogo size="md" />
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-xs text-muted-foreground">Админ-панель</span>
-          <Badge variant="gold" className="text-[10px] py-0">v1.0</Badge>
+        <div className="mt-1 flex items-center gap-2">
+          <span className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+            админ-панель
+          </span>
+          <Badge variant="gold" className="py-0 text-[10px]">
+            Reyhan
+          </Badge>
         </div>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {NAV_ITEMS.map(({ href, label, Icon }) => {
           const isActive =
-            href === ROUTES.admin.home
-              ? pathname === href
-              : pathname.startsWith(href);
+            href === ROUTES.admin.home ? pathname === href : pathname.startsWith(href);
 
           return (
             <Link
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition-all duration-200",
                 isActive
-                  ? "bg-gold/10 text-gold border border-gold/20"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  ? "border border-gold/20 bg-gold/10 text-gold"
+                  : "text-muted-foreground hover:bg-white/5 hover:text-hotel-cream"
               )}
             >
-              <Icon className={cn("h-4 w-4 stroke-[1.5]", isActive && "stroke-2")} />
+              <Icon className={cn("h-4 w-4 stroke-[1.5]", isActive && "stroke-[2]")} />
               {label}
             </Link>
           );
         })}
       </nav>
 
-      {/* Admin profile */}
-      <div className="border-t border-border p-4">
-        <div className="hotel-card p-3 flex items-center gap-3">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full gold-gradient text-white text-sm font-medium">
-            А
+      <div className="border-t border-gold/10 p-4">
+        <div className="hotel-card flex items-center gap-3 p-3">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full gold-gradient text-sm font-medium text-gold-foreground">
+            A
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium truncate">Администратор</div>
-            <div className="text-xs text-muted-foreground truncate">
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium text-hotel-cream">Администратор</div>
+            <div className="truncate text-xs text-muted-foreground">
               {adminEmail ?? "admin@reyhan.ru"}
             </div>
           </div>
@@ -110,7 +109,7 @@ export function AdminSidebar({ adminEmail, onClose }: AdminSidebarProps) {
         <form action={adminLogout}>
           <button
             type="submit"
-            className="mt-2 w-full flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted-foreground hover:text-hotel-red hover:bg-hotel-red/5 transition-all duration-200"
+            className="mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted-foreground transition-all duration-200 hover:bg-red-500/10 hover:text-red-300"
           >
             <LogOut className="h-4 w-4" />
             Выйти
