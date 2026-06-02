@@ -1,13 +1,11 @@
 "use client";
 
-import { Tv2, BedDouble } from "lucide-react";
-
-type RoomStatus = "available" | "occupied" | "maintenance";
+import { BedDouble, Tv2 } from "lucide-react";
 
 const STATUS_CONFIG: Record<string, { label: string; dot: string }> = {
-  available:   { label: "Свободен",     dot: "bg-emerald-400" },
-  occupied:    { label: "Занят",        dot: "bg-amber-400"   },
-  maintenance: { label: "Обслуживание", dot: "bg-red-400"     },
+  available: { label: "Свободен", dot: "#4fb38a" },
+  occupied: { label: "Занят", dot: "#c8a255" },
+  maintenance: { label: "Обслуживание", dot: "#d46c6c" },
 };
 
 interface Room {
@@ -19,60 +17,209 @@ interface Room {
 
 export function TvConnectClient({ rooms }: { rooms: Room[] }) {
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col">
+    <div
+      style={{
+        minHeight: "100vh",
+        color: "#f4ead7",
+        background:
+          "radial-gradient(circle at 14% 18%, rgba(200,162,85,.12), transparent 18%), radial-gradient(circle at 86% 8%, rgba(81,47,114,.28), transparent 24%), linear-gradient(145deg, #16332b 0%, #0d211b 52%, #241634 100%)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 1520,
+          width: "100%",
+          margin: "0 auto",
+          padding: "56px 32px 72px",
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 14,
+              marginBottom: 18,
+            }}
+          >
+            <Tv2 style={{ width: 40, height: 40, color: "#c8a255" }} />
+            <span
+              style={{
+                fontFamily: "var(--font-playfair, serif)",
+                fontSize: "2.9rem",
+                color: "#f4ead7",
+              }}
+            >
+              Reyhan Hotel
+            </span>
+          </div>
 
-      <div className="flex flex-col items-center justify-center pt-16 pb-10 px-8 text-center">
-        <div className="flex items-center gap-3 mb-6">
-          <Tv2 className="h-10 w-10 text-amber-400" />
-          <span className="font-serif text-4xl font-light tracking-wide">Reyhan Hotel</span>
+          <div
+            style={{
+              fontSize: "0.95rem",
+              letterSpacing: "0.42em",
+              textTransform: "uppercase",
+              color: "#c8a255",
+              marginBottom: 14,
+            }}
+          >
+            Подключение телевизора
+          </div>
+
+          <h1
+            style={{
+              margin: 0,
+              fontFamily: "var(--font-playfair, serif)",
+              fontSize: "4.4rem",
+              lineHeight: 1.06,
+              fontWeight: 400,
+            }}
+          >
+            Выберите номер для TV
+          </h1>
+
+          <p
+            style={{
+              maxWidth: 760,
+              margin: "18px auto 0",
+              fontSize: "1.22rem",
+              lineHeight: 1.8,
+              color: "rgba(244,234,215,.72)",
+            }}
+          >
+            После выбора телевизор будет постоянно открыт на экране номера и автоматически
+            обновлять состояние гостя.
+          </p>
         </div>
-        <h1 className="text-5xl font-serif font-light mb-4">Подключение телевизора</h1>
-        <p className="text-xl text-white/50 max-w-lg leading-relaxed">
-          Выберите номер, к которому подключён этот телевизор
-        </p>
-      </div>
 
-      <div className="flex-1 max-w-5xl mx-auto w-full px-8 pb-16">
         {rooms.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-white/30 gap-4">
-            <BedDouble className="h-16 w-16" />
-            <p className="text-2xl">Нет доступных номеров</p>
-            <p className="text-lg">Добавьте номера в админ-панели</p>
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 18,
+              color: "rgba(244,234,215,.65)",
+            }}
+          >
+            <BedDouble style={{ width: 72, height: 72, color: "#c8a255" }} />
+            <div
+              style={{
+                fontFamily: "var(--font-playfair, serif)",
+                fontSize: "2.6rem",
+              }}
+            >
+              Нет доступных номеров
+            </div>
+            <div style={{ fontSize: "1.15rem", color: "rgba(244,234,215,.52)" }}>
+              Добавьте номера в админ-панели и попробуйте снова.
+            </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+              gap: 18,
+              flex: 1,
+            }}
+          >
             {rooms.map((room) => {
-              const st = STATUS_CONFIG[room.status] ?? STATUS_CONFIG.available;
+              const status = STATUS_CONFIG[room.status] ?? STATUS_CONFIG.available;
+
               return (
-                /* Plain <a href> — works without any JavaScript */
                 <a
                   key={room.id}
                   href={`/tv/room/${room.number}`}
-                  className="
-                    flex flex-col gap-4 p-6 rounded-3xl no-underline
-                    bg-white/5 border-2 border-white/10
-                    hover:bg-amber-400/10 hover:border-amber-400/50
-                    focus:bg-amber-400/10 focus:border-amber-400/70
-                    active:bg-amber-400/20
-                    transition-all duration-150
-                    outline-none focus:ring-4 focus:ring-amber-400/30
-                  "
+                  style={{
+                    textDecoration: "none",
+                    color: "inherit",
+                    borderRadius: 28,
+                    padding: "24px 24px 22px",
+                    minHeight: 216,
+                    border: "1px solid rgba(200,162,85,.16)",
+                    background:
+                      "linear-gradient(180deg, rgba(36,22,52,.78), rgba(18,39,32,.92))",
+                    boxShadow: "0 30px 70px -42px rgba(0,0,0,.65)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 14,
+                    transition: "transform .15s ease, border-color .15s ease, background .15s ease",
+                  }}
                 >
-                  <div className="font-serif text-7xl font-light leading-none text-white/90">
+                  <div
+                    style={{
+                      fontSize: "0.78rem",
+                      letterSpacing: "0.22em",
+                      textTransform: "uppercase",
+                      color: "rgba(244,234,215,.44)",
+                    }}
+                  >
+                    номер
+                  </div>
+
+                  <div
+                    style={{
+                      fontFamily: "var(--font-playfair, serif)",
+                      fontSize: "4rem",
+                      lineHeight: 1,
+                      color: "#f4ead7",
+                    }}
+                  >
                     {room.number}
                   </div>
 
-                  {room.floor ? (
-                    <div className="text-base text-white/30">{room.floor} этаж</div>
-                  ) : null}
-
-                  <div className="flex items-center gap-2">
-                    <div className={`h-3 w-3 rounded-full flex-shrink-0 ${st.dot}`} />
-                    <span className="text-base text-white/50">{st.label}</span>
+                  <div style={{ fontSize: "1rem", color: "rgba(244,234,215,.64)" }}>
+                    {room.floor ? `${room.floor} этаж` : "Этаж не указан"}
                   </div>
 
-                  <div className="mt-auto pt-2 text-base font-medium text-amber-400">
-                    Подключить →
+                  <div
+                    style={{
+                      marginTop: "auto",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 999,
+                          background: status.dot,
+                          boxShadow: `0 0 0 5px ${status.dot}22`,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span style={{ fontSize: "0.95rem", color: "rgba(244,234,215,.72)" }}>
+                        {status.label}
+                      </span>
+                    </div>
+
+                    <span
+                      style={{
+                        fontSize: "0.95rem",
+                        fontWeight: 700,
+                        color: "#c8a255",
+                      }}
+                    >
+                      Подключить
+                    </span>
                   </div>
                 </a>
               );
@@ -83,4 +230,3 @@ export function TvConnectClient({ rooms }: { rooms: Room[] }) {
     </div>
   );
 }
-
